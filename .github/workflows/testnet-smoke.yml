@@ -1,0 +1,40 @@
+name: Testnet Smoke Suite
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - main
+      - 'release/**'
+
+jobs:
+  smoke:
+    name: Run Testnet Smoke
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'workflow_dispatch' || ((startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/heads/release/')) && secrets.TESTNET_SMOKE_ENABLED == 'true')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install smoke tool deps
+        working-directory: tools/testnet-smoke
+        run: |
+          npm ci
+
+      - name: Run smoke script
+        working-directory: tools/testnet-smoke
+        env:
+          TESTNET_RPC_URL: ${{ secrets.TESTNET_RPC_URL }}
+          TESTNET_PRIVATE_KEY: ${{ secrets.TESTNET_PRIVATE_KEY }}
+          TESTNET_SMOKE_ENABLED: ${{ secrets.TESTNET_SMOKE_ENABLED }}
+          SMOKE_RETRIES: 3
+          SMOKE_RETRY_DELAY_MS: 5000
+          SMOKE_OP_TIMEOUT_MS: 120000
+        run: |
+          node index.js
