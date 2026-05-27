@@ -745,8 +745,6 @@ impl AidEscrow {
         }
 
         if package.expires_at > 0 && now > package.expires_at {
-            package.status = PackageStatus::Expired;
-            env.storage().persistent().set(&key, &package);
             return Err(Error::PackageExpired);
         }
 
@@ -794,8 +792,6 @@ impl AidEscrow {
         }
 
         if package.expires_at > 0 && now > package.expires_at {
-            package.status = PackageStatus::Expired;
-            env.storage().persistent().set(&key, &package);
             return Err(Error::PackageExpired);
         }
 
