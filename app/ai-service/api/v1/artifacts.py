@@ -6,8 +6,8 @@ import logging
 import os
 from typing import Literal
 
-from fastapi import APIRouter, Header, HTTPException, Query
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Header, Query
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
 from config import settings
@@ -37,7 +37,10 @@ async def request_artifact_access(
     x_user_id: str = Header(default="unknown", alias="X-User-Id"),
 ):
     if not artifact_access_service.validate_role(x_user_role):
-        raise HTTPException(status_code=403, detail="forbidden_role")
+        return JSONResponse(
+            status_code=403,
+            content={"error": {"code": "forbidden_role", "message": "forbidden_role"}},
+        )
 
     try:
         artifact_path, metadata = artifact_access_service.resolve_artifact(artifact_id)
@@ -45,7 +48,10 @@ async def request_artifact_access(
     except ArtifactAccessError as exc:
         detail = str(exc)
         status_code = 404 if detail == "artifact_not_found" else 403
-        raise HTTPException(status_code=status_code, detail=detail) from exc
+        return JSONResponse(
+            status_code=status_code,
+            content={"error": {"code": detail, "message": detail}},
+        )
 
     logger.info(
         "artifact_access_granted",
@@ -81,7 +87,12 @@ async def download_artifact_with_token(token: str = Query(..., min_length=10)):
         artifact_path, metadata = artifact_access_service.resolve_artifact(payload["aid"])
         artifact_access_service.enforce_org_ownership(metadata, payload["org"])
     except ArtifactAccessError as exc:
-        raise HTTPException(status_code=403, detail=str(exc)) from exc
+        detail = str(exc)
+        status_code = 404 if detail == "artifact_not_found" else 403
+        return JSONResponse(
+            status_code=status_code,
+            content={"error": {"code": detail, "message": detail}},
+        )
 
     logger.info(
         "artifact_downloaded_with_signed_url",
