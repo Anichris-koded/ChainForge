@@ -6,6 +6,8 @@ import { useWalletStore } from "../lib/walletStore";
 import { useToast } from "./ToastProvider";
 import { ErrorInline } from "./ErrorInline";
 import { useNetworkGuard } from "../hooks/useNetworkGuard";
+import { buildExplorerUrl } from "../lib/explorer";
+import { ExternalLink } from "lucide-react";
 
 export const WalletConnect: React.FC = () => {
   const [loading, setLoading] = useState(false);
@@ -153,9 +155,16 @@ export const WalletConnect: React.FC = () => {
               {network.toUpperCase()}
             </span>
           )}
-          <span className="text-white text-sm bg-gray-900 px-3 py-1 rounded-md border border-gray-700">
+          <a
+            href={buildExplorerUrl('address', publicKey)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-white text-sm bg-gray-900 hover:bg-gray-800 px-3 py-1 rounded-md border border-gray-700 hover:border-gray-600 transition flex items-center gap-1.5"
+            title="View address on explorer"
+          >
             {publicKey.substring(0, 4)}...{publicKey.substring(publicKey.length - 4)}
-          </span>
+            <ExternalLink size={12} className="opacity-60" />
+          </a>
           <button
             onClick={handleDisconnect}
             className="px-3 py-1 rounded-md bg-red-600/80 text-white text-sm hover:bg-red-700 transition"
