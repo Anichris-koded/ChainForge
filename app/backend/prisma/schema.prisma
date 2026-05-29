@@ -296,6 +296,7 @@ model Organization {
   sessions  Session[]
   verificationSessions VerificationSession[]
   verificationRequests VerificationRequest[]
+  evidenceQueueItems EvidenceQueueItem[] @relation("OrganizationEvidenceQueueItems")
 
   @@index([deletedAt])
 }
@@ -431,23 +432,30 @@ enum EvidenceStatus {
 }
 
 model EvidenceQueueItem {
-  id          String         @id @default(cuid())
-  fileName    String
-  filePath    String?        // Path to local encrypted file
-  fileHash    String         @unique // To prevent duplicate uploads
-  mimeType    String
-  size        Int
-  status      EvidenceStatus @default(pending)
-  retryCount  Int            @default(0)
-  lastError   String?
-  ownerId     String         // Actor who queued this
-  metadata    Json?          // Additional info (e.g., associated claimId)
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  id            String         @id @default(cuid())
+  fileName      String
+  filePath      String?        // Path to local encrypted file
+  fileHash      String         @unique // To prevent duplicate uploads globally
+  fingerprint   String?        // Stable fingerprint for near-duplicate detection
+  mimeType      String
+  size          Int
+  status        EvidenceStatus @default(pending)
+  retryCount    Int            @default(0)
+  lastError     String?
+  ownerId       String         // Actor who queued this
+  orgId         String?        // Organization scope for deduplication
+  organization  Organization?  @relation("OrganizationEvidenceQueueItems", fields: [orgId], references: [id])
+  nearDuplicateOf String?     // Points to original if this is a near-duplicate
+  metadata      Json?          // Additional info (e.g., associated claimId)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 
   @@index([status])
   @@index([ownerId])
   @@index([fileHash])
+  @@index([orgId])
+  @@index([fingerprint])
+  @@index([nearDuplicateOf])
 }
 
 enum NotificationOutboxStatus {

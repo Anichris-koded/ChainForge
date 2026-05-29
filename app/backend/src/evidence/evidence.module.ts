@@ -4,10 +4,12 @@ import { EvidenceController } from './evidence.controller';
 import { PrismaModule } from '../prisma/prisma.module';
 import { EncryptionModule } from '../common/encryption/encryption.module';
 import { AuditModule } from '../audit/audit.module';
+import { FingerprintService } from './fingerprint.service';
 
 @Module({
   imports: [PrismaModule, EncryptionModule, AuditModule],
   controllers: [EvidenceController],
-  providers: [EvidenceService],
+  providers: [EvidenceService, FingerprintService],
+  exports: [FingerprintService],
 })
 export class EvidenceModule {}

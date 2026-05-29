@@ -62,20 +62,84 @@ describe('Evidence Queue (e2e)', () => {
     expect(savedContent.toString()).not.toContain('test evidence content');
   });
 
-  it('POST /evidence/upload prevents duplicates', async () => {
+  it('POST /evidence/upload prevents exact duplicates within org scope', async () => {
     const fileContent = Buffer.from('unique content');
+    const orgId = 'org-123';
 
     await request(app.getHttpServer())
       .post('/api/v1/evidence/upload')
       .attach('file', fileContent, 'test1.txt')
+      .set('x-org-id', orgId)
       .expect(201);
 
     const res = await request(app.getHttpServer())
       .post('/api/v1/evidence/upload')
       .attach('file', fileContent, 'test2.txt')
+      .set('x-org-id', orgId)
       .expect(400);
 
-    expect(res.body.message).toBe('File already exists in queue');
+    expect(res.body.message).toContain('already exists in queue for this organization');
+  });
+
+  it('POST /evidence/upload allows same file in different organizations (tenant isolation)', async () => {
+    const fileContent = Buffer.from('shared content');
+    const org1Id = 'org-1';
+    const org2Id = 'org-2';
+
+    const res1 = await request(app.getHttpServer())
+      .post('/api/v1/evidence/upload')
+      .attach('file', fileContent, 'test1.txt')
+      .set('x-org-id', org1Id)
+      .expect(201);
+
+    const res2 = await request(app.getHttpServer())
+      .post('/api/v1/evidence/upload')
+      .attach('file', fileContent, 'test2.txt')
+      .set('x-org-id', org2Id)
+      .expect(201);
+
+    expect(res1.body.id).not.toBe(res2.body.id);
+    expect(res1.body.orgId).toBe(org1Id);
+    expect(res2.body.orgId).toBe(org2Id);
+  });
+
+  it('POST /evidence/upload stores fingerprint for near-duplicate detection', async () => {
+    const fileContent = Buffer.from('fingerprint test content');
+
+    const res = await request(app.getHttpServer())
+      .post('/api/v1/evidence/upload')
+      .attach('file', fileContent, 'test.txt')
+      .expect(201);
+
+    const item = await prisma.evidenceQueueItem.findUnique({
+      where: { id: res.body.id },
+    });
+
+    expect(item?.fingerprint).toBeDefined();
+    expect(item?.fingerprint).toHaveLength(64);
+  });
+
+  it('POST /evidence/upload creates near-duplicate reference when fingerprint matches', async () => {
+    const fileContent = Buffer.from('near duplicate test');
+    const orgId = 'org-456';
+
+    // Upload original
+    const originalRes = await request(app.getHttpServer())
+      .post('/api/v1/evidence/upload')
+      .attach('file', fileContent, 'original.txt')
+      .set('x-org-id', orgId)
+      .expect(201);
+
+    // Upload near-duplicate (same content, different filename)
+    const duplicateRes = await request(app.getHttpServer())
+      .post('/api/v1/evidence/upload')
+      .attach('file', fileContent, 'duplicate.txt')
+      .set('x-org-id', orgId)
+      .expect(201);
+
+    expect(duplicateRes.body.nearDuplicateOf).toBe(originalRes.body.id);
+    expect(duplicateRes.body.status).toBe(EvidenceStatus.completed);
+    expect(duplicateRes.body.filePath).toBeNull(); // No file stored for near-duplicate
   });
 
   it('GET /evidence/queue lists items', async () => {
@@ -257,5 +321,30 @@ describe('Evidence Queue (e2e)', () => {
 
     expect(item?.fileHash).toBeDefined();
     expect(item?.fileHash).toHaveLength(64);
+  });
+
+  it('Near-duplicate detection preserves auditability with metadata', async () => {
+    const fileContent = Buffer.from('audit test content');
+    const orgId = 'org-789';
+
+    const originalRes = await request(app.getHttpServer())
+      .post('/api/v1/evidence/upload')
+      .attach('file', fileContent, 'original.txt')
+      .set('x-org-id', orgId)
+      .expect(201);
+
+    const duplicateRes = await request(app.getHttpServer())
+      .post('/api/v1/evidence/upload')
+      .attach('file', fileContent, 'duplicate.txt')
+      .set('x-org-id', orgId)
+      .expect(201);
+
+    const duplicateItem = await prisma.evidenceQueueItem.findUnique({
+      where: { id: duplicateRes.body.id },
+    });
+
+    expect(duplicateItem?.metadata).toBeDefined();
+    expect(duplicateItem?.metadata?.isNearDuplicate).toBe(true);
+    expect(duplicateItem?.metadata?.originalId).toBe(originalRes.body.id);
   });
 });
