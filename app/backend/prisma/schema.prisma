@@ -296,6 +296,7 @@ model Organization {
   sessions  Session[]
   verificationSessions VerificationSession[]
   verificationRequests VerificationRequest[]
+  evidenceQueueItems EvidenceQueueItem[]
 
   @@index([deletedAt])
 }
