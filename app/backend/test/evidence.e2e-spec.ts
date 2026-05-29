@@ -7,6 +7,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { EvidenceStatus } from '@prisma/client';
 import { App } from 'supertest/types';
+import { MAX_FILE_SIZE } from 'src/evidence/file-validation';
 
 describe('Evidence Queue (e2e)', () => {
   let app: INestApplication<App>;
@@ -131,8 +132,102 @@ describe('Evidence Queue (e2e)', () => {
     expect(res.body.message).toContain('Invalid MIME type');
   });
 
-  it('POST /evidence/upload rejects oversized files', async () => {
-    const largeFile = Buffer.alloc(11 * 1024 * 1024, 'a');
+  it('POST /evidence/upload rejects a disallowed file extension', async () => {
+    const fileContent = Buffer.from('totally text but wrong extension');
+
+    const res = await request(app.getHttpServer())
+      .post('/api/v1/evidence/upload')
+      .attach('file', fileContent, {
+        filename: 'malware.exe',
+        contentType: 'text/plain',
+      })
+      .expect(400);
+
+    expect(res.body.message).toContain('extension');
+  });
+
+  it('POST /evidence/upload rejects an unsafe (path-traversal) filename', async () => {
+    const fileContent = Buffer.from('escape attempt');
+
+    const res = await request(app.getHttpServer())
+      .post('/api/v1/evidence/upload')
+      .attach('file', fileContent, {
+        filename: '../../evil.txt',
+        contentType: 'text/plain',
+      })
+      .expect(400);
+
+    expect(res.body.message).toContain('filename');
+  });
+
+  it('POST /evidence/upload rejects content that does not match its declared type', async () => {
+    // Declared as a PNG but the bytes are plain text — magic-byte sniffing
+    // must reject it.
+    const fileContent = Buffer.from('this is not really a png image');
+
+    const res = await request(app.getHttpServer())
+      .post('/api/v1/evidence/upload')
+      .attach('file', fileContent, {
+        filename: 'fake.png',
+        contentType: 'image/png',
+      })
+      .expect(400);
+
+    expect(res.body.message).toMatch(/do not match/i);
+  });
+
+  it('POST /evidence/upload rejects an empty file', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/api/v1/evidence/upload')
+      .attach('file', Buffer.alloc(0), {
+        filename: 'empty.txt',
+        contentType: 'text/plain',
+      })
+      .expect(400);
+
+    expect(res.body.message).toMatch(/empty/i);
+  });
+
+  it('POST /evidence/upload rejects more than one file', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/api/v1/evidence/upload')
+      .attach('file', Buffer.from('first'), {
+        filename: 'a.txt',
+        contentType: 'text/plain',
+      })
+      .attach('file', Buffer.from('second'), {
+        filename: 'b.txt',
+        contentType: 'text/plain',
+      })
+      .expect(400);
+
+    expect(res.body.message).toMatch(/single file/i);
+  });
+
+  it('POST /evidence/upload rejects a request with no file', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/api/v1/evidence/upload')
+      .field('note', 'no file attached')
+      .expect(400);
+
+    expect(res.body.message).toContain('No file uploaded');
+  });
+
+  it('POST /evidence/upload accepts a file exactly at the size limit', async () => {
+    // 'a' repeated up to the limit sniffs as text/plain.
+    const atLimit = Buffer.alloc(MAX_FILE_SIZE, 0x61);
+
+    await request(app.getHttpServer())
+      .post('/api/v1/evidence/upload')
+      .attach('file', atLimit, {
+        filename: 'at-limit.txt',
+        contentType: 'text/plain',
+      })
+      .expect(201);
+  });
+
+  it('POST /evidence/upload rejects oversized files with 413', async () => {
+    const largeFile = Buffer.alloc(MAX_FILE_SIZE + 1024, 'a');
 
     const res = await request(app.getHttpServer())
       .post('/api/v1/evidence/upload')
@@ -140,7 +235,7 @@ describe('Evidence Queue (e2e)', () => {
         filename: 'big.txt',
         contentType: 'text/plain',
       })
-      .expect(400);
+      .expect(413);
 
     expect(res.body.message).toContain('File too large');
   });
