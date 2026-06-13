@@ -252,7 +252,7 @@ function Invoke-Cleanup {
     docker-compose down 2>$null
     
     # Remove test images
-    docker rmi soter-ai-service:test soter-ai-service:dev-test soter-ai-service:gpu-test 2>$null
+    docker rmi chainforge-ai-service:test soter-ai-service:dev-test soter-ai-service:gpu-test 2>$null
     
     Write-Status "Cleanup completed ✓"
 }
