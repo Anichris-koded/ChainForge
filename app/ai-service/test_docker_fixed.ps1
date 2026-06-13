@@ -66,7 +66,7 @@ function Test-Build {
     Write-Status "Testing Docker build (production stage)..."
     
     try {
-        $result = docker build -t soter-ai-service:test --target production . 2>&1
+        $result = docker build -t chainforge-ai-service:test --target production . 2>&1
         if ($LASTEXITCODE -ne 0) {
             throw "Production build failed: $result"
         }
