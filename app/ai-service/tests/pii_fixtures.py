@@ -42,7 +42,7 @@ PII_FIXTURES = [
 SAFE_TEXT_FIXTURES = [
     {
         "name": "product_names",
-        "text": "The Soter mobile app is built on the Stellar network.",
+        "text": "The ChainForge mobile app is built on the Stellar network.",
         "should_not_contain": ["[RECIPIENT_NAME]", "[LOCATION]"]
     },
     {
