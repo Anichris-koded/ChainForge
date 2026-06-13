@@ -11,7 +11,7 @@ export default async function Home({ params }: PageProps) {
     <main className="container mx-auto px-4 py-16 grow">
       <div className="max-w-4xl mx-auto text-center space-y-8">
         <h1 className="text-5xl md:text-6xl font-bold tracking-tight text-blue-900 dark:text-white">
-          Soter
+          ChainForge
         </h1>
         <p className="text-xl md:text-2xl text-gray-900 dark:text-gray-400">
           Transparent Aid, Directly Delivered

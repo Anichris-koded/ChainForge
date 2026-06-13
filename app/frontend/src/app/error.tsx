@@ -19,7 +19,7 @@ export default function Error({
   return (
     <ErrorState
       title="We couldn't load this page"
-      description="Soter ran into a temporary problem while preparing this route. Try again or return home to continue."
+      description="ChainForge ran into a temporary problem while preparing this route. Try again or return home to continue."
       error={error}
       onTryAgain={reset}
     />

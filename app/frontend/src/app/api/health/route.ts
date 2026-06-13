@@ -5,7 +5,7 @@ export async function GET() {
     {
       status: "ok",
       timestamp: new Date().toISOString(),
-      service: "soter-frontend",
+      service: "chainforge-frontend",
     },
     { status: 200 }
   );

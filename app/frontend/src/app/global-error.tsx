@@ -17,7 +17,7 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
     <html lang="en">
       <body className="antialiased flex flex-col items-center justify-center min-h-screen bg-slate-950 text-slate-50 p-6">
         <div className="max-w-md w-full border border-slate-800 bg-slate-900/50 p-6 rounded-xl shadow-2xl text-center backdrop-blur-sm">
-          {/* Soter Icon/Brand Placeholder */}
+          {/* ChainForge Icon/Brand Placeholder */}
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-rose-500/10 text-rose-500">
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -36,7 +36,7 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
           </div>
 
           <h2 className="text-xl font-bold text-white mb-2">
-            Soter is temporarily unavailable
+            ChainForge is temporarily unavailable
           </h2>
           
           <p className="text-sm text-slate-400 mb-6 leading-relaxed">

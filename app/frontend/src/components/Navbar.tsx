@@ -50,7 +50,7 @@ export function Navbar() {
       <div className="container mx-auto flex items-center justify-between gap-4">
         <div className="flex items-center gap-6">
           <Link href="/" className="text-xl font-bold">
-            Soter
+            ChainForge
           </Link>
           
           <div className="hidden md:flex items-center gap-2">
