@@ -113,7 +113,7 @@ function Test-Container {
             --link redis-test:redis `
             -e REDIS_URL=redis://redis:6379/0 `
             -e APP_ENV=test `
-            soter-ai-service:test | Out-Null
+            chainforge-ai-service:test | Out-Null
         
         # Wait for service to be ready
         Write-Status "Waiting for AI service to be ready..."
