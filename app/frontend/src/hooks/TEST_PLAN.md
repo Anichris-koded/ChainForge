@@ -1,7 +1,7 @@
 # Optimistic Mutation UX - Test Plan
 
 ## Overview
-This document outlines the test plan for verifying the Optimistic Mutation UX implementation for Campaign Actions in the Soter project.
+This document outlines the test plan for verifying the Optimistic Mutation UX implementation for Campaign Actions in the ChainForge project.
 
 ## Requirements Tested
 

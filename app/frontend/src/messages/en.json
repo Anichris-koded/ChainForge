@@ -1,6 +1,6 @@
 {
   "common": {
-    "soter": "Soter",
+    "chainforge": "ChainForge",
     "loading": "Loading...",
     "error": "Error",
     "success": "Success",
@@ -163,7 +163,7 @@
   },
   "demoChecklist": {
     "title": "Testnet Demo Checklist",
-    "subtitle": "Follow these steps to verify the Soter demo flow end-to-end on Testnet. Check off each step as you complete it.",
+    "subtitle": "Follow these steps to verify the ChainForge demo flow end-to-end on Testnet. Check off each step as you complete it.",
     "progress": "{{completed}} of {{total}} steps complete",
     "allComplete": "All steps completed — the demo flow checks out!",
     "stepConnectWallet": "Connect your Freighter wallet",

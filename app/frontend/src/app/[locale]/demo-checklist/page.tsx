@@ -151,7 +151,7 @@ export default function DemoChecklistPage() {
   }, [router]);
 
   // Persist checked state in localStorage so reviewers can track progress
-  const STORAGE_KEY = 'soter-demo-checklist';
+  const STORAGE_KEY = 'chainforge-demo-checklist';
 
   const [checkedSteps, setCheckedSteps] = useState<Record<string, boolean>>({});
 
