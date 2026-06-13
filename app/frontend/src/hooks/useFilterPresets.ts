@@ -5,7 +5,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { useMemo } from 'react';
 import type { FilterPreset, AidPackageFilters, FilterScope } from '@/types/aid-package';
 
-const STORAGE_KEY = 'soter-filter-presets';
+const STORAGE_KEY = 'chainforge-filter-presets';
 
 function generateId(): string {
   return `preset-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;

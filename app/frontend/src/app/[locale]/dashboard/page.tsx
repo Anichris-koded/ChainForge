@@ -57,7 +57,7 @@ export default function AidDashboard() {
           </div>
           <div className="text-center">
             <p className="text-lg text-gray-700 dark:text-gray-300 max-w-2xl mx-auto">
-              This dashboard displays humanitarian aid packages funded via Soter on the Stellar /
+              This dashboard displays humanitarian aid packages funded via ChainForge on the Stellar /
               Soroban blockchain — every distribution anchored onchain and auditable by anyone.
             </p>
           </div>

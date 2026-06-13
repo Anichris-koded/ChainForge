@@ -61,7 +61,7 @@ interface EnvSpec {
   validate?: (value: string) => boolean;
 }
 
-/** Required public environment variables for a correct Soter deployment. */
+/** Required public environment variables for a correct ChainForge deployment. */
 const REQUIRED_ENV_SPECS: EnvSpec[] = [
   {
     key: 'NEXT_PUBLIC_API_URL',

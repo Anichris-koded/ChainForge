@@ -11,7 +11,7 @@ const healthHandler: MockHandler = async () => {
     status: 'ok',
     timestamp: new Date().toISOString(),
     version: '1.0.0-mock',
-    service: 'soter-backend-mock',
+    service: 'chainforge-backend-mock',
     details: {
       uptime: 12345,
     },
