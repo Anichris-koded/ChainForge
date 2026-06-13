@@ -10,7 +10,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from services.ocr import OCRService
 from regression_harness.models import (
-    EvaluationSample, SampleResult, FieldEvaluation, 
+    EvaluationSample, SampleResult, FieldEvaluation,
     RegressionReport, BoundingBox
 )
 
@@ -41,14 +41,14 @@ class OCREvaluator:
 
         image = Image.open(image_path)
         result = self.ocr_service.process_image(image)
-        
+       
         field_evals = []
         all_passed = True
 
         # Check expected fields
         for field_name, expected_value in sample.expected_fields.items():
             actual_match = result.fields.get(field_name)
-            
+           
             if not actual_match:
                 field_evals.append(FieldEvaluation(
                     field_name=field_name,
@@ -61,15 +61,15 @@ class OCREvaluator:
             else:
                 actual_value = actual_match.value
                 is_match = self._compare_values(expected_value, actual_value)
-                
+               
                 error_type = None
                 if not is_match:
                     error_type = "incorrect_value"
                     all_passed = False
-                
+               
                 # Note: Simplified bbox check as current OCRService doesn't return bboxes per field in OCRResult yet.
                 # If it did, we would use _calculate_iou here.
-                
+               
                 field_evals.append(FieldEvaluation(
                     field_name=field_name,
                     expected_value=expected_value,
@@ -132,11 +132,11 @@ class OCREvaluator:
         for sample in samples:
             res = self.evaluate_sample(sample, base_dir)
             results.append(res)
-            
+           
             for eval_item in res.field_evaluations:
                 if eval_item.error_type in error_counts:
                     error_counts[eval_item.error_type] += 1
-                
+               
                 if eval_item.is_match and eval_item.confidence < self.tolerance_threshold:
                     error_counts["low_confidence"] += 1
 
