@@ -1,21 +1,23 @@
-# ChainForge Mobile 📱
+# ChainForge Mobile
 
 Field operations application for humanitarian aid distribution, built with Expo and TypeScript.
 
-## Overview
+ChainForge Mobile empowers field operators, NGO workers, and recipients to interact with on-chain aid packages directly from their mobile devices. The app supports QR-based package scanning, WalletConnect v2 integration, biometric security, and real-time system health monitoring.
 
-ChainForge Mobile empowers field operators, NGO workers, and recipients to interact with on-chain aid packages directly from their mobile devices. The app supports QR-based package scanning, wallet connection via WalletConnect v2, and real-time system health monitoring.
+---
 
 ## Features
 
-- **Home Screen** — Quick overview, wallet connection, and primary actions.
-- **QR Scanner** — Scan `chainforge://` deep links to view and claim aid packages.
-- **Bulk Scanner** — High-throughput scanning mode for field operators processing multiple packages.
-- **Health Screen** — Real-time system diagnostics with environment indicator and mock-data fallback.
-- **Wallet Integration** — WalletConnect v2 pairing with compatible Stellar wallets (Lobstr, Freighter, Beans).
-- **Biometric Lock** — Face ID / fingerprint protection for sensitive aid details.
-- **Saver Mode** — Automatic data-saving mode on slow or metered connections.
-- **Offline Queue** — Claim confirmations queued and retried when connectivity is restored.
+- **Home screen** — Quick overview, wallet connection, and primary actions
+- **QR scanner** — Scan `chainforge://` deep links to view and claim aid packages
+- **Bulk scanner** — High-throughput scanning for field operators processing multiple packages
+- **Health screen** — Real-time system diagnostics with environment indicator and mock-data fallback
+- **Wallet integration** — WalletConnect v2 pairing with compatible Stellar wallets (Lobstr, Freighter, Beans)
+- **Biometric lock** — Face ID and fingerprint protection for sensitive aid details
+- **Saver mode** — Automatic data-saving mode on slow or metered connections
+- **Offline queue** — Claim confirmations queued and retried when connectivity is restored
+
+---
 
 ## Setup
 
@@ -33,27 +35,25 @@ cd app/mobile
 pnpm install
 ```
 
-### Environment Variables
-
-Copy the example file:
+### Environment variables
 
 ```bash
 cp .env.example .env
 ```
 
-All Expo public variables use the `EXPO_PUBLIC_` prefix — they are safe to ship in any build.
+All Expo public variables use the `EXPO_PUBLIC_` prefix and are safe to ship in any build.
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
 | `EXPO_PUBLIC_API_URL` | Yes | `http://localhost:3000` | Backend API base URL |
 | `EXPO_PUBLIC_ENV_NAME` | No | auto-inferred | Environment label (`dev`, `staging`, `prod`) |
 | `EXPO_PUBLIC_NETWORK` | No | `testnet` | Stellar network identifier |
-| `EXPO_PUBLIC_WALLETCONNECT_PROJECT_ID` | Yes\* | — | WalletConnect v2 project ID |
+| `EXPO_PUBLIC_WALLETCONNECT_PROJECT_ID` | Yes* | — | WalletConnect v2 project ID |
 | `EXPO_PUBLIC_SOROBAN_CONTRACT_ID` | No | — | Deployed AidEscrow contract ID |
 
-\* Required for wallet pairing flows.
+* Required for wallet pairing flows.
 
-#### API URL Examples
+#### API URL examples
 
 ```bash
 # iOS Simulator
@@ -69,14 +69,14 @@ EXPO_PUBLIC_API_URL=http://192.168.1.10:3000
 EXPO_PUBLIC_API_URL=https://api.chainforge.app
 ```
 
-### Deep Link Scheme
+### Deep link scheme
 
 The app registers the `chainforge://` custom scheme for QR code scanning and wallet return flows:
 
 - **Package links**: `chainforge://package/{aidId}`
 - **Wallet callbacks**: `chainforge://wallet/callback`
 
-### WalletConnect Setup
+### WalletConnect setup
 
 1. Create a project at [WalletConnect Dashboard](https://dashboard.walletconnect.com)
 2. Set `EXPO_PUBLIC_WALLETCONNECT_PROJECT_ID` in `.env`
@@ -96,20 +96,22 @@ pnpm ios            # iOS simulator / device
 pnpm web            # Web browser preview
 ```
 
-## Health Screen
+---
 
-The Health Screen fetches backend status from `${EXPO_PUBLIC_API_URL}/health`. If unreachable, it falls back to mock data with a **"🔧 MOCK"** badge and troubleshooting tips.
+## Health screen
 
-An **environment badge** (top-right header) and **footer row** display the active configuration:
+The health screen fetches backend status from `${EXPO_PUBLIC_API_URL}/health`. If the backend is unreachable, it falls back to mock data with a mock badge and troubleshooting tips. An environment badge in the top-right header and footer row display the active configuration:
 
 ```
 Environment: dev · localhost:3000
 ```
 
-## Scripts
+---
+
+## Available scripts
 
 | Script | Purpose |
-|--------|---------|
+|---|---|
 | `pnpm start` | Start Expo dev server with Metro bundler |
 | `pnpm android` | Run on Android emulator or device |
 | `pnpm ios` | Run on iOS simulator or device |
@@ -117,13 +119,23 @@ Environment: dev · localhost:3000
 | `pnpm test` | Run Jest test suite |
 | `pnpm lint` | Run ESLint for code quality |
 
+---
+
 ## Troubleshooting
 
 | Problem | Solution |
-|---------|----------|
+|---|---|
 | Connection refused | Use machine's LAN IP for physical devices |
 | Metro not starting | Clear cache: `expo start -c` |
 | Wrong environment | Verify `.env` values, restart Metro with `-c` |
 | WalletConnect fails | Confirm `EXPO_PUBLIC_WALLETCONNECT_PROJECT_ID` is set |
 
 For detailed development workflow and testing procedures, see [CONTRIBUTING.md](./CONTRIBUTING.md).
+
+---
+
+## Related documentation
+
+- [Root README](../../README.md) — Project overview
+- [Backend README](../backend/README.md) — API documentation
+- [On-Chain README](../onchain/README.md) — Smart contract reference
