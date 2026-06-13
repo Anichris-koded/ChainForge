@@ -24,7 +24,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 COPY . .
 
 # Create non-root user
-RUN useradd --create-home --shell /bin/bash soter && \
+RUN useradd --create-home --shell /bin/bash chainforge && \
     chown -R soter:soter /app
 USER soter
 
