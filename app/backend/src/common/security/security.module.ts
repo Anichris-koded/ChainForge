@@ -270,6 +270,15 @@ export const createRateLimiter = (config: ConfigService): RequestHandler => {
     next();
   };
 };
-
+/**
+ * CSRF Protection Posture:
+ * CSRF is currently mitigated by design due to our stateless, token-based authentication
+ * mechanism (`x-api-key` header). Since browsers do not automatically attach custom headers
+ * on cross-origin requests, CSRF attacks are inherently prevented.
+ * 
+ * WARNING:
+ * If cookie-based session management or any browser-managed credentials are introduced 
+ * in the future, CSRF protection middleware MUST be implemented.
+ */
 @Module({})
 export class SecurityModule {}
