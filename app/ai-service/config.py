@@ -33,6 +33,16 @@ class Settings(BaseSettings):
         BACKEND_WEBHOOK_URL: Webhook URL to notify NestJS backend when tasks complete
         PROOF_OF_LIFE_CONFIDENCE_THRESHOLD: Default threshold for liveness verification
         PROOF_OF_LIFE_MIN_FACE_SIZE: Minimum detected face size in pixels
+        MAX_REQUEST_BODY_BYTES: Maximum allowed HTTP request body size in bytes.
+            Oversized payloads are rejected with HTTP 413 before the body is
+            read into memory, mitigating memory-exhaustion DoS attacks.
+            Default: 10485760 (10 MiB). Set to 0 to disable (not recommended).
+        REQUEST_BODY_BYPASS_PATHS: Comma-separated list that exempts paths
+            from body-size limiting. Entries without a trailing '/' must
+            match the path exactly; entries with a trailing '/' (e.g.
+            '/hooks/') match any path with that prefix. The built-in
+            infrastructure defaults (/health, /, /ai/metrics, /docs,
+            /redoc, /openapi.json) are always merged in.
     """
 
     # API Keys
@@ -66,6 +76,16 @@ class Settings(BaseSettings):
     # Proof-of-life settings
     proof_of_life_confidence_threshold: float = 0.65
     proof_of_life_min_face_size: int = 80
+
+    # Request body size protection (DoS mitigation). Default is 10 MiB.
+    # Set to 0 or negative to disable the limit (not recommended in
+    # production).
+    max_request_body_bytes: int = 10 * 1024 * 1024
+
+    # Paths that bypass body-size checks. Comma-separated prefix list.
+    # Health probes, metrics scrape, and OpenAPI/docs endpoints are
+    # always appended so operators cannot accidentally expose themselves.
+    request_body_bypass_paths: str = ""
 
     # Verification artifact access settings
     verification_artifacts_dir: str = "./artifacts/verification"

@@ -7,6 +7,7 @@ Main entry point for the AI service layer.
 from contextlib import asynccontextmanager
 from pydantic import BaseModel, Field
 from typing import Any, Dict, List, Optional
+import json
 import logging
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Request
@@ -38,6 +39,199 @@ from schemas.humanitarian import (
     HumanitarianVerificationResponse,
 )
 from services.humanitarian_verification import HumanitarianVerificationService
+
+class HTTPBodyTooLarge(Exception):
+    """Internal signal raised when an incoming request body exceeds the
+    configured `max_request_body_bytes` limit. Caught and converted to a
+    413 response by :class:`MaxRequestBodySizeMiddleware`."""
+
+    def __init__(self, limit: int, observed: int):
+        super().__init__(
+            f"Request body of {observed} bytes exceeds limit of {limit} bytes"
+        )
+        self.limit = limit
+        self.observed = observed
+
+
+class MaxRequestBodySizeMiddleware:
+    """Reject HTTP requests whose body would exceed ``max_bytes``.
+
+    The middleware sits at the outer edge of the ASGI stack so that oversized
+    requests are rejected *before* any other middleware (redirects,
+    observability, rate limiting) or the application itself buffers the body.
+    It is DoS-grade protection: clients can trip the limit either by sending a
+    ``Content-Length`` header that exceeds the cap, or by streaming more bytes
+    than the cap via chunked transfer encoding.
+
+    The middleware intentionally wraps the raw ASGI ``receive`` callable rather
+    than using Starlette's ``BaseHTTPMiddleware`` — ``BaseHTTPMiddleware``
+    buffers the body in-memory which defeats the point of the limit.
+    """
+
+    METHODS_WITH_BODY = ("POST", "PUT", "PATCH")
+
+    def __init__(self, app, max_bytes: int, bypass_prefixes: Optional[List[str]] = None):
+        self.app = app
+        # Treat non-positive values as "disabled" — useful for tests that
+        # don't want the limit to interfere.
+        self.max_bytes = max_bytes if max_bytes and max_bytes > 0 else None
+        # Always skip health/metrics/docs endpoints to match the pattern used
+        # by monitor_requests. Allow additional prefixes via settings.
+        default_bypass = [
+            "/health",
+            "/",
+            "/ai/metrics",
+            "/docs",
+            "/redoc",
+            "/openapi.json",
+        ]
+        self.bypass_prefixes = tuple({*(default_bypass), *(bypass_prefixes or [])})
+
+    def _is_bypassed(self, path: str) -> bool:
+        if path in self.bypass_prefixes:
+            return True
+        # Prefix matching only applies to entries that explicitly opt in
+        # via a trailing '/'.  The root '/' is intentionally excluded:
+        # otherwise every HTTP path (which all begin with '/') would be
+        # bypassed.
+        return any(
+            path.startswith(p)
+            for p in self.bypass_prefixes
+            if p.endswith("/") and p != "/"
+        )
+
+    async def __call__(self, scope, receive, send):
+        # Only operate on HTTP requests; pass through WebSocket / lifespan.
+        if scope["type"] != "http":
+            return await self.app(scope, receive, send)
+
+        # No limit configured or no body expected — no-op.
+        if self.max_bytes is None or scope["method"] not in self.METHODS_WITH_BODY:
+            return await self.app(scope, receive, send)
+
+        path = scope.get("path", "")
+        if self._is_bypassed(path):
+            return await self.app(scope, receive, send)
+
+        # Eager check on Content-Length. If the client declared a body
+        # larger than the limit, reject immediately without consuming any
+        # bytes off the wire.
+        try:
+            content_length_hdr = None
+            for name, value in scope.get("headers", []):
+                if name == b"content-length":
+                    content_length_hdr = value.decode("latin-1")
+                    break
+            if content_length_hdr is not None:
+                declared = int(content_length_hdr)
+                if declared > self.max_bytes:
+                    await self._log_rejection(
+                        scope,
+                        declared_or_observed=declared,
+                        reason="declared_size",
+                    )
+                    return await self._send_413(
+                        send,
+                        observed=declared,
+                        reason="declared_size",
+                    )
+        except (ValueError, TypeError):
+            # Malformed Content-Length — fall through to stream counting.
+            pass
+
+        total = 0
+
+        async def wrapped_receive():
+            nonlocal total
+            message = await receive()
+            mtype = message.get("type")
+            if mtype == "http.request":
+                chunk = message.get("body", b"")
+                total += len(chunk)
+                if total > self.max_bytes:
+                    # Signal the exception so that the outer __call__ can
+                    # emit a 413 even if the application has already started
+                    # producing a response.
+                    raise HTTPBodyTooLarge(self.max_bytes, total)
+            return message
+
+        try:
+            await self.app(scope, wrapped_receive, send)
+        except HTTPBodyTooLarge as exc:
+            await self._log_rejection(
+                scope,
+                declared_or_observed=exc.observed,
+                reason="streamed_size",
+            )
+            await self._send_413(
+                send,
+                observed=exc.observed,
+                reason="streamed_size",
+            )
+
+    async def _send_413(self, send, observed: int, reason: str):
+        """Emit a JSON 413 response using the project's ErrorEnvelope shape.
+
+        ``reason`` distinguishes eager (Content-Length) rejection from
+        streamed rejection; the message is worded accordingly so the
+        response is precise and not misleading.
+        """
+        if reason == "declared_size":
+            msg = (
+                f"Declared request body of {observed} bytes exceeds the "
+                f"maximum allowed size of {self.max_bytes} bytes."
+            )
+        else:
+            msg = (
+                f"Request body streamed so far ({observed} bytes) exceeds "
+                f"the maximum allowed size of {self.max_bytes} bytes."
+            )
+
+        envelope = ErrorEnvelope(
+            error=ErrorDetail(
+                code="PAYLOAD_TOO_LARGE",
+                message=msg,
+            )
+        ).model_dump()
+        body = json.dumps(envelope).encode("utf-8")
+
+        await send(
+            {
+                "type": "http.response.start",
+                "status": 413,
+                "headers": [
+                    (b"content-type", b"application/json"),
+                    (b"content-length", str(len(body)).encode("ascii")),
+                ],
+            }
+        )
+        await send({"type": "http.response.body", "body": body})
+
+    async def _log_rejection(
+        self,
+        scope,
+        declared_or_observed: int,
+        reason: str,
+    ) -> None:
+        """Emit a structured warning so operators can correlate DoS attempts.
+
+        ``reason`` is either ``"declared_size"`` (Content-Length spoofing)
+        or ``"streamed_size"`` (chunked transfer smuggling), so logs
+        differentiate between attack classes.
+        """
+        client = scope.get("client")
+        client_str = f"{client[0]}:{client[1]}" if client else "unknown"
+        logger.warning(
+            "request body rejected: method=%s path=%s bytes=%d limit=%d "
+            "client=%s reason=%s",
+            scope.get("method"),
+            scope.get("path"),
+            declared_or_observed,
+            self.max_bytes,
+            client_str,
+            reason,
+        )
+
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -91,6 +285,20 @@ app = FastAPI(
     description="AI service layer for the ChainForge platform using FastAPI",
     version="1.0.0",
     lifespan=lifespan,
+)
+
+# Register the body-size limit at the outermost layer so it short-circuits
+# before legacy redirects, observability middleware, or any handler buffers
+# the request body.
+_bypass_paths = [
+    p.strip()
+    for p in (settings.request_body_bypass_paths or "").split(",")
+    if p.strip()
+]
+app.add_middleware(
+    MaxRequestBodySizeMiddleware,
+    max_bytes=settings.max_request_body_bytes,
+    bypass_prefixes=_bypass_paths,
 )
 
 proof_of_life_analyzer = ProofOfLifeAnalyzer(

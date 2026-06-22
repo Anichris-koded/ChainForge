@@ -30,6 +30,8 @@ The service starts at `http://localhost:8000`. Interactive API documentation is 
 | `LOG_LEVEL` | `INFO` | Logging verbosity |
 | `REDIS_URL` | `redis://localhost:6379/0` | Redis connection for task queue |
 | `BACKEND_WEBHOOK_URL` | `http://localhost:3001/ai/webhook` | Backend notification endpoint |
+| `MAX_REQUEST_BODY_BYTES` | `10485760` (10 MiB) | Maximum HTTP request body size; oversized requests are rejected with HTTP 413 to prevent memory-exhaustion DoS. Set to `0` to disable (not recommended in production). |
+| `REQUEST_BODY_BYPASS_PATHS` | _(empty)_ | Comma-separated path entries that bypass body-size limiting. Entries without a trailing `'/'` must match the path exactly; entries with a trailing `'/'` (e.g. `/hooks/`) match any path with that prefix. The default bypass list (`/health`, `/`, `/ai/metrics`, `/docs`, `/redoc`, `/openapi.json`) is always merged in. |
 
 ## Core services
 
