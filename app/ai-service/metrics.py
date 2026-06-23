@@ -17,6 +17,37 @@ MODEL_LOAD_TIME = Histogram('model_load_time_seconds', 'Model load time in secon
 INFERENCE_LATENCY = Histogram('inference_latency_seconds', 'Inference latency in seconds', ['task_type'])
 PIPELINE_STEP_LATENCY = Histogram('pipeline_step_latency_seconds', 'Pipeline step latency in seconds', ['step_name'])
 
+# Circuit breaker metrics
+# State is encoded numerically so it can be plotted over time:
+#   0 = CLOSED (healthy), 1 = HALF_OPEN (probing), 2 = OPEN (failing fast).
+CIRCUIT_STATE = Gauge(
+    'circuit_breaker_state',
+    'Circuit breaker state (0=CLOSED, 1=HALF_OPEN, 2=OPEN)',
+    ['breaker_name'],
+)
+CIRCUIT_FAILURE_COUNT = Counter(
+    'circuit_breaker_failure_count_total',
+    'Total failures recorded by the circuit breaker',
+    ['breaker_name'],
+)
+CIRCUIT_RECOVERY_TIME = Histogram(
+    'circuit_breaker_recovery_time_seconds',
+    'Time spent in the OPEN state before transitioning to HALF_OPEN',
+    ['breaker_name'],
+)
+
+# Circuit-breaker state constants. Exported so callers (and tests) can
+# compare against the numeric gauge value without hard-coding literals.
+CIRCUIT_STATE_CLOSED = 0
+CIRCUIT_STATE_HALF_OPEN = 1
+CIRCUIT_STATE_OPEN = 2
+
+
+def set_circuit_state(breaker_name: str, state_value: int) -> None:
+    """Helper to update the circuit-state gauge from anywhere."""
+    CIRCUIT_STATE.labels(breaker_name=breaker_name).set(state_value)
+
+
 def check_system_resources(memory_threshold_percent: float = 90.0) -> bool:
     """
     Check if system RAM or VRAM is above threshold.
