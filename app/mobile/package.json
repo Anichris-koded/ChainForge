@@ -71,5 +71,11 @@
       "node_modules/(?!(?:.pnpm/)?((jest-)?react-native|@react-native(?:/.*)?|react-clone-referenced-element|@react-navigation(?:/.*)?|expo(?:nent)?(?:/.*)?|@expo(?:nent)?(?:/.*)?|expo-.*|@expo-google-fonts/.*|react-navigation|@walletconnect(?:/.*)?))"
     ]
   },
-  "private": true
+  "private": true,
+  "pnpm": {
+    "overrides": {
+      "jest": "^29.7.0",
+      "jest-runtime": "^29.7.0"
+    }
+  }
 }

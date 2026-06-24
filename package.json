@@ -7,6 +7,12 @@
     "lint": "pnpm -r lint",
     "test": "pnpm -r test"
   },
+  "pnpm": {
+    "overrides": {
+      "jest": "^30.4.2",
+      "jest-runtime": "^30.4.2"
+    }
+  },
   "devDependencies": {
     "@prisma/client": "^7.4.1",
     "@types/express": "^5.0.6",

@@ -43,6 +43,7 @@ import { DeploymentMetadataModule } from './deployment-metadata/deployment-metad
 import { RedisModule } from '@liaoliaots/nestjs-redis';
 import { AdaptiveRateLimitGuard } from './common/guards/adaptive-rate-limit.guard';
 import { DeprecationInterceptor } from './common/interceptors/deprecation.interceptor';
+import { HttpCacheInterceptor } from './common/interceptors/http-cache.interceptor';
 import { SandboxModule } from './sandbox/sandbox.module';
 
 @Module({
@@ -157,6 +158,12 @@ import { SandboxModule } from './sandbox/sandbox.module';
     {
       provide: APP_INTERCEPTOR,
       useClass: DeprecationInterceptor,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      // Registered last so it runs closest to the route handler and
+      // observes the raw response body for ETag computation.
+      useClass: HttpCacheInterceptor,
     },
   ],
 })
