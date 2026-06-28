@@ -43,6 +43,7 @@ import {
 } from './onchain.adapter';
 import { SorobanErrorMapper } from './utils/soroban-error.mapper';
 import { withRetryTimeout } from './utils/retry-with-timeout';
+import { toContractString, toStringRecord } from './utils/contract-value';
 
 @Injectable()
 export class SorobanAdapter implements OnchainAdapter {
@@ -135,7 +136,7 @@ export class SorobanAdapter implements OnchainAdapter {
     method: string,
     args: xdr.ScVal[],
     correlationId: string,
-  ): Promise<{ hash: string; result: any }> {
+  ): Promise<{ hash: string; result: unknown }> {
     const server = this.getServer();
     const kp = this.getKeypair();
     const contract = new Contract(this.contractId);
@@ -230,7 +231,7 @@ export class SorobanAdapter implements OnchainAdapter {
     method: string,
     args: xdr.ScVal[],
     correlationId: string,
-  ): Promise<any> {
+  ): Promise<unknown> {
     const server = this.getServer();
     const kp = this.getKeypair();
     const contract = new Contract(this.contractId);
@@ -275,16 +276,19 @@ export class SorobanAdapter implements OnchainAdapter {
     return null;
   }
 
-  private extractContractError(receipt: any): string {
-    if (receipt?.result?.retval) {
-      try {
-        const val = scValToNative(receipt.result.retval);
-        if (typeof val === 'object' && val !== null) {
-          return JSON.stringify(val);
+  private extractContractError(receipt: unknown): string {
+    if (receipt && typeof receipt === 'object' && 'result' in receipt) {
+      const result = (receipt as { result?: unknown }).result;
+      if (result && typeof result === 'object' && 'retval' in result) {
+        try {
+          const val = scValToNative((result as { retval: xdr.ScVal }).retval);
+          if (typeof val === 'object' && val !== null) {
+            return JSON.stringify(val);
+          }
+          return String(val);
+        } catch {
+          // fall through
         }
-        return String(val);
-      } catch {
-        // fall through
       }
     }
     return 'Contract transaction failed';
@@ -329,21 +333,22 @@ export class SorobanAdapter implements OnchainAdapter {
     return nativeToScVal(mapVal, { type: 'map' });
   }
 
-  private parsePackage(scv: any): AidPackage | null {
+  private parsePackage(scv: unknown): AidPackage | null {
     if (!scv || typeof scv !== 'object') return null;
+    const obj = scv as Record<string, unknown>;
     return {
-      id: String(scv.id ?? ''),
-      recipient: scv.recipient ?? '',
-      amount: String(scv.amount ?? '0'),
-      token: scv.token ?? '',
-      status: this.parseStatus(scv.status),
-      createdAt: Number(scv.created_at ?? 0),
-      expiresAt: Number(scv.expires_at ?? 0),
-      metadata: scv.metadata ?? undefined,
+      id: toContractString(obj.id),
+      recipient: toContractString(obj.recipient),
+      amount: toContractString(obj.amount, '0'),
+      token: toContractString(obj.token),
+      status: this.parseStatus(obj.status),
+      createdAt: Number(obj.created_at ?? 0),
+      expiresAt: Number(obj.expires_at ?? 0),
+      metadata: toStringRecord(obj.metadata),
     };
   }
 
-  private parseStatus(status: any): AidPackage['status'] {
+  private parseStatus(status: unknown): AidPackage['status'] {
     if (typeof status === 'number') {
       const map: Record<number, AidPackage['status']> = {
         0: 'Created',
@@ -411,7 +416,7 @@ export class SorobanAdapter implements OnchainAdapter {
     );
 
     return {
-      packageId: String(result ?? params.packageId),
+      packageId: toContractString(result, params.packageId),
       transactionHash: hash,
       timestamp: new Date(),
       status: 'success',
@@ -556,17 +561,21 @@ export class SorobanAdapter implements OnchainAdapter {
     const cid = this.correlationId();
     this.logger.log(`[${cid}] getAidPackageCount token=${params.token}`);
 
-    const result = await this.simulateReadOnly(
+    const raw = await this.simulateReadOnly(
       'get_aggregates',
       [this.scvAddress(params.token)],
       cid,
     );
+    const result = raw as Record<string, unknown> | null;
 
     return {
       aggregates: {
-        totalCommitted: String(result?.total_committed ?? '0'),
-        totalClaimed: String(result?.total_claimed ?? '0'),
-        totalExpiredCancelled: String(result?.total_expired_cancelled ?? '0'),
+        totalCommitted: toContractString(result?.total_committed, '0'),
+        totalClaimed: toContractString(result?.total_claimed, '0'),
+        totalExpiredCancelled: toContractString(
+          result?.total_expired_cancelled,
+          '0',
+        ),
       },
       timestamp: new Date(),
     };
@@ -622,7 +631,7 @@ export class SorobanAdapter implements OnchainAdapter {
     const version = await this.simulateReadOnly('get_version', [], cid);
 
     return {
-      version: String(version ?? '0'),
+      version: toContractString(version, '0'),
       name: 'Soroban AidEscrow Contract',
       timestamp: new Date(),
     };

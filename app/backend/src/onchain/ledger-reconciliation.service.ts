@@ -13,9 +13,26 @@ export interface ReconciliationJobData {
 export interface ReconciliationDiscrepancy {
   ledger: number;
   type: 'missing' | 'amount_mismatch' | 'count_mismatch';
-  expected: any;
-  observed: any;
+  expected: unknown;
+  observed: unknown;
   severity: 'low' | 'medium' | 'high';
+}
+
+export interface OnChainLedgerEntry {
+  id: string;
+  ledger: number;
+  amount: number;
+  eventType: string;
+}
+
+interface ReconciliationProgressSnapshot {
+  startLedger?: number;
+  endLedger?: number;
+  totalLedgers?: number;
+  checkedLedgers?: number;
+  discrepancies?: ReconciliationDiscrepancy[];
+  summary?: ReconciliationReport['summary'];
+  actionable?: boolean;
 }
 
 export interface ReconciliationReport {
@@ -198,7 +215,10 @@ export class LedgerReconciliationService {
     };
   }
 
-  private fetchOnChainData(_startLedger: number, _endLedger: number): any[] {
+  private fetchOnChainData(
+    _startLedger: number,
+    _endLedger: number,
+  ): OnChainLedgerEntry[] {
     // Placeholder for actual Horizon API call
     // In production, this would query the Stellar Horizon API
     return [];
@@ -231,7 +251,7 @@ export class LedgerReconciliationService {
     }
 
     const state = await job.getState();
-    const progress = job.progress as any;
+    const progress = job.progress as ReconciliationProgressSnapshot | undefined;
 
     return {
       jobId: job.id || 'unknown',

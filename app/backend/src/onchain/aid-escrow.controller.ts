@@ -27,6 +27,15 @@ import {
   BatchCreateAidPackagesDto,
 } from './dto/aid-escrow.dto';
 import { SorobanErrorMapper } from './utils/soroban-error.mapper';
+import {
+  CreateAidPackageResult,
+  BatchCreateAidPackagesResult,
+  ClaimAidPackageResult,
+  DisburseAidPackageResult,
+  GetAidPackageResult,
+  GetAidPackageCountResult,
+  GetTransactionStatusResult,
+} from './onchain.adapter';
 
 /**
  * AidEscrowController
@@ -75,13 +84,13 @@ export class AidEscrowController {
   async createAidPackage(
     @Body() dto: CreateAidPackageDto,
     @Req() req: Request & { user?: { address?: string } },
-  ): Promise<any> {
+  ): Promise<CreateAidPackageResult> {
     try {
       const operatorAddress = req.user?.address || 'admin';
       return await this.aidEscrowService.createAidPackage(dto, operatorAddress);
     } catch (error) {
       this.logger.error('Failed to create aid package:', error);
-      this.errorMapper.throwMappedError(error);
+      return this.errorMapper.throwMappedError(error);
     }
   }
 
@@ -121,7 +130,7 @@ export class AidEscrowController {
   async batchCreateAidPackages(
     @Body() dto: BatchCreateAidPackagesDto,
     @Req() req: Request & { user?: { address?: string } },
-  ): Promise<any> {
+  ): Promise<BatchCreateAidPackagesResult> {
     if (dto.recipientAddresses.length !== dto.amounts.length) {
       throw new BadRequestException(
         'Recipients and amounts arrays must have the same length',
@@ -136,7 +145,7 @@ export class AidEscrowController {
       );
     } catch (error) {
       this.logger.error('Failed to batch create aid packages:', error);
-      this.errorMapper.throwMappedError(error);
+      return this.errorMapper.throwMappedError(error);
     }
   }
 
@@ -176,7 +185,7 @@ export class AidEscrowController {
   async claimAidPackage(
     @Param('id') packageId: string,
     @Req() req: Request & { user?: { address?: string } },
-  ): Promise<any> {
+  ): Promise<ClaimAidPackageResult> {
     const recipientAddress = req.user?.address;
     if (!recipientAddress) {
       throw new BadRequestException('Recipient address required');
@@ -189,7 +198,7 @@ export class AidEscrowController {
       );
     } catch (error) {
       this.logger.error('Failed to claim aid package:', error);
-      this.errorMapper.throwMappedError(error);
+      return this.errorMapper.throwMappedError(error);
     }
   }
 
@@ -231,7 +240,7 @@ export class AidEscrowController {
   async disburseAidPackage(
     @Param('id') packageId: string,
     @Req() req: Request & { user?: { address?: string } },
-  ): Promise<any> {
+  ): Promise<DisburseAidPackageResult> {
     try {
       const operatorAddress = req.user?.address || 'admin';
       return await this.aidEscrowService.disburseAidPackage(
@@ -240,7 +249,7 @@ export class AidEscrowController {
       );
     } catch (error) {
       this.logger.error('Failed to disburse aid package:', error);
-      this.errorMapper.throwMappedError(error);
+      return this.errorMapper.throwMappedError(error);
     }
   }
 
@@ -279,12 +288,14 @@ export class AidEscrowController {
   @ApiInternalServerErrorResponse({
     description: 'Failed to retrieve package.',
   })
-  async getAidPackage(@Param('id') packageId: string): Promise<any> {
+  async getAidPackage(
+    @Param('id') packageId: string,
+  ): Promise<GetAidPackageResult> {
     try {
       return await this.aidEscrowService.getAidPackage({ packageId });
     } catch (error) {
       this.logger.error('Failed to get aid package:', error);
-      this.errorMapper.throwMappedError(error);
+      return this.errorMapper.throwMappedError(error);
     }
   }
 
@@ -316,7 +327,7 @@ export class AidEscrowController {
   @ApiInternalServerErrorResponse({
     description: 'Failed to retrieve statistics.',
   })
-  async getAidPackageStats(): Promise<any> {
+  async getAidPackageStats(): Promise<GetAidPackageCountResult> {
     try {
       // For now, return aggregates for a default token
       // In production, this should be parameterized or determined from context
@@ -327,7 +338,7 @@ export class AidEscrowController {
       });
     } catch (error) {
       this.logger.error('Failed to get aid package stats:', error);
-      this.errorMapper.throwMappedError(error);
+      return this.errorMapper.throwMappedError(error);
     }
   }
 
@@ -358,7 +369,9 @@ export class AidEscrowController {
   @ApiInternalServerErrorResponse({
     description: 'Failed to retrieve transaction status.',
   })
-  async getTransactionStatus(@Param('hash') hash: string): Promise<any> {
+  async getTransactionStatus(
+    @Param('hash') hash: string,
+  ): Promise<GetTransactionStatusResult> {
     if (!hash || hash.length < 10) {
       throw new BadRequestException('Invalid transaction hash');
     }
@@ -366,7 +379,7 @@ export class AidEscrowController {
       return await this.aidEscrowService.getTransactionStatus(hash);
     } catch (error) {
       this.logger.error('Failed to get transaction status:', error);
-      this.errorMapper.throwMappedError(error);
+      return this.errorMapper.throwMappedError(error);
     }
   }
 }

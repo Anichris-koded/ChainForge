@@ -19,6 +19,23 @@ export interface BackfillResult {
   totalCount: number;
 }
 
+export interface BackfillLedgerEntry {
+  id: string;
+  campaignId?: string;
+  claimId?: string;
+  eventType: string;
+  amount: number;
+  note?: string;
+  createdAt: Date;
+}
+
+interface BackfillProgressSnapshot {
+  startLedger?: number;
+  endLedger?: number;
+  processed?: number;
+  total?: number;
+}
+
 @Injectable()
 export class LedgerBackfillService {
   private readonly logger = new Logger(LedgerBackfillService.name);
@@ -140,10 +157,21 @@ export class LedgerBackfillService {
         continue;
       }
 
+      // campaignId is required on BalanceLedger; skip entries we cannot
+      // attribute to a campaign rather than failing the whole range.
+      const resolvedCampaignId = entry.campaignId ?? campaignId;
+      if (!resolvedCampaignId) {
+        this.logger.warn(
+          `Skipping ledger entry ${entry.id}: no campaignId available`,
+        );
+        skipped++;
+        continue;
+      }
+
       await this.prisma.balanceLedger.create({
         data: {
           id: entry.id,
-          campaignId: entry.campaignId || campaignId,
+          campaignId: resolvedCampaignId,
           claimId: entry.claimId,
           eventType: entry.eventType,
           amount: entry.amount,
@@ -162,7 +190,10 @@ export class LedgerBackfillService {
     return { processed, skipped };
   }
 
-  private fetchLedgerRange(_startLedger: number, _endLedger: number): any[] {
+  private fetchLedgerRange(
+    _startLedger: number,
+    _endLedger: number,
+  ): BackfillLedgerEntry[] {
     // Placeholder for actual Horizon API call
     // In production, this would query the Stellar Horizon API
     return [];
@@ -176,7 +207,7 @@ export class LedgerBackfillService {
     }
 
     const state = await job.getState();
-    const progress = job.progress as any;
+    const progress = job.progress as BackfillProgressSnapshot | undefined;
 
     return {
       jobId: job.id || 'unknown',

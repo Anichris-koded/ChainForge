@@ -4,6 +4,22 @@ import {
 } from '@nestjs/common';
 
 /**
+ * Minimal shape covering the fields this mapper inspects across the
+ * various error sources it may receive (Node network errors, Axios
+ * errors, and Soroban SDK errors).
+ */
+interface SorobanErrorLike {
+  code?: string | number;
+  message?: string;
+  errorCode?: number;
+  response?: {
+    data?: {
+      error?: unknown;
+    };
+  };
+}
+
+/**
  * Maps Soroban contract errors to standardized backend error responses
  * Aligns with the global error handling strategy
  */
@@ -41,45 +57,39 @@ export class SorobanErrorMapper {
   /**
    * Maps a Soroban error to a backend-compatible error with HTTP status code
    */
-  mapError(error: any): {
+  mapError(error: unknown): {
     statusCode: number;
     message: string;
     details?: Record<string, unknown>;
   } {
+    const err = error as SorobanErrorLike | null | undefined;
+
     // Handle RPC/Network errors
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    if (error?.code === 'ECONNREFUSED' || error?.code === 'ENOTFOUND') {
+    if (err?.code === 'ECONNREFUSED' || err?.code === 'ENOTFOUND') {
       return {
         statusCode: 503,
         message: 'Blockchain network unreachable',
         details: {
           error_type: 'network_error',
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-          original_error: error?.message,
+          original_error: err?.message,
         },
       };
     }
 
     // Handle JSON-RPC errors (Soroban RPC Server responses)
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    if (error?.response?.data?.error) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
-      const jsonRpcError = error.response.data.error;
-      return this.mapJsonRpcError(jsonRpcError);
+    if (err?.response?.data?.error) {
+      return this.mapJsonRpcError(err.response.data.error);
     }
 
     // Handle Soroban SDK errors with specific error codes
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    if (error?.errorCode !== undefined) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      const mapping = this.contractErrors[error.errorCode as number];
+    if (err?.errorCode !== undefined) {
+      const mapping = this.contractErrors[err.errorCode];
       if (mapping) {
         return {
           statusCode: mapping.code,
           message: mapping.message,
           details: {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-            error_code: error.errorCode,
+            error_code: err.errorCode,
             error_type: 'contract_error',
           },
         };
@@ -87,8 +97,7 @@ export class SorobanErrorMapper {
     }
 
     // Handle contract invocation errors
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    const message = error?.message as string | undefined;
+    const message = err?.message;
     if (
       message &&
       (message.includes('NotInitialized') ||
@@ -105,8 +114,7 @@ export class SorobanErrorMapper {
     }
 
     // Handle timeout errors
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    if (error?.code === 'ETIMEDOUT' || message?.includes('timeout')) {
+    if (err?.code === 'ETIMEDOUT' || message?.includes('timeout')) {
       return {
         statusCode: 504,
         message: 'Blockchain operation timed out',
@@ -143,15 +151,17 @@ export class SorobanErrorMapper {
   /**
    * Maps JSON-RPC error responses (from Soroban RPC)
    */
-  private mapJsonRpcError(jsonRpcError: any): {
+  private mapJsonRpcError(jsonRpcError: unknown): {
     statusCode: number;
     message: string;
     details?: Record<string, unknown>;
   } {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-    const code = jsonRpcError.code;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    const message = (jsonRpcError.message as string) || '';
+    const rpcError = jsonRpcError as
+      | { code?: number; message?: string }
+      | null
+      | undefined;
+    const code = rpcError?.code ?? 0;
+    const message = rpcError?.message || '';
 
     if (message.includes('Error(Contract')) {
       return this.mapContractErrorMessage(message);
@@ -178,7 +188,7 @@ export class SorobanErrorMapper {
         return {
           statusCode: 500,
           message: 'Blockchain RPC internal error',
-          details: { error_code: code as number, rpc_message: message },
+          details: { error_code: code, rpc_message: message },
         };
 
       default:
@@ -187,13 +197,13 @@ export class SorobanErrorMapper {
           return {
             statusCode: 500,
             message: 'Blockchain RPC server error',
-            details: { error_code: code as number, rpc_message: message },
+            details: { error_code: code, rpc_message: message },
           };
         }
         return {
           statusCode: 500,
           message: 'Blockchain RPC error',
-          details: { error_code: code as number, rpc_message: message },
+          details: { error_code: code, rpc_message: message },
         };
     }
   }

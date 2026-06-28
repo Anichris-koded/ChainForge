@@ -3,6 +3,7 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import {
   OnchainJobData,
+  OnchainJobInput,
   OnchainOperationType,
 } from './interfaces/onchain-job.interface';
 import { LoggerService } from '../logger/logger.service';
@@ -39,7 +40,10 @@ export class OnchainService {
   ) {}
 
   async enqueueInitEscrow(params: InitEscrowJobParams) {
-    return this.enqueue(OnchainOperationType.INIT_ESCROW, params);
+    return this.enqueue({
+      type: OnchainOperationType.INIT_ESCROW,
+      params,
+    });
   }
 
   async enqueueCreateClaim(params: CreateClaimJobParams) {
@@ -47,7 +51,10 @@ export class OnchainService {
     if (!params.tokenAddress) {
       throw new Error('tokenAddress is required for creating a claim');
     }
-    return this.enqueue(OnchainOperationType.CREATE_CLAIM, params);
+    return this.enqueue({
+      type: OnchainOperationType.CREATE_CLAIM,
+      params,
+    });
   }
 
   async enqueueDisburse(params: DisburseJobParams) {
@@ -55,18 +62,20 @@ export class OnchainService {
     if (!params.tokenAddress) {
       throw new Error('tokenAddress is required for disbursement');
     }
-    return this.enqueue(OnchainOperationType.DISBURSE, params);
+    return this.enqueue({
+      type: OnchainOperationType.DISBURSE,
+      params,
+    });
   }
 
-  private async enqueue(type: OnchainOperationType, params: unknown) {
+  private async enqueue(input: OnchainJobInput) {
     const data: OnchainJobData = {
-      type,
-      params,
+      ...input,
       timestamp: Date.now(),
       correlationId: this.loggerService.getCorrelationId(),
     };
 
-    const job = await this.onchainQueue.add(type, data, {
+    const job = await this.onchainQueue.add(input.type, data, {
       attempts: 5,
       backoff: {
         type: 'exponential',
@@ -79,7 +88,7 @@ export class OnchainService {
       ? ` [correlationId=${data.correlationId}]`
       : '';
     this.logger.log(
-      `Enqueued onchain job: ${job.id} for ${type}${correlationSuffix}`,
+      `Enqueued onchain job: ${job.id} for ${input.type}${correlationSuffix}`,
     );
     return job;
   }

@@ -27,7 +27,7 @@ export interface InitEscrowResult {
   transactionHash: string;
   timestamp: Date;
   status: 'success' | 'failed';
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface CreateAidPackageParams {
@@ -45,7 +45,7 @@ export interface CreateAidPackageResult {
   transactionHash: string;
   timestamp: Date;
   status: 'success' | 'failed';
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface BatchCreateAidPackagesParams {
@@ -61,7 +61,7 @@ export interface BatchCreateAidPackagesResult {
   transactionHash: string;
   timestamp: Date;
   status: 'success' | 'failed';
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface ClaimAidPackageParams {
@@ -75,7 +75,7 @@ export interface ClaimAidPackageResult {
   timestamp: Date;
   status: 'success' | 'failed';
   amountClaimed: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface DisburseAidPackageParams {
@@ -89,7 +89,7 @@ export interface DisburseAidPackageResult {
   timestamp: Date;
   status: 'success' | 'failed';
   amountDisbursed: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface GetAidPackageParams {
@@ -184,7 +184,7 @@ export interface CreateClaimResult {
   transactionHash: string;
   timestamp: Date;
   status: 'success' | 'failed';
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface DisburseParams {
@@ -200,7 +200,7 @@ export interface DisburseResult {
   timestamp: Date;
   status: 'success' | 'failed';
   amountDisbursed: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 /**
