@@ -27,9 +27,7 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "test:e2e:ci": "prisma migrate deploy && jest --config ./test/jest-e2e.json --runInBand",
-    "spec:export": "ts-node --transpile-only -r tsconfig-paths/register scripts/export-spec.ts",
-    "db:backfill-api-keys": "ts-node --transpile-only scripts/api-key-backfill.ts",
-    "db:backfill-api-keys:dry-run": "DRY_RUN=true ts-node --transpile-only scripts/api-key-backfill.ts"
+    "spec:export": "ts-node --transpile-only -r tsconfig-paths/register scripts/export-spec.ts"
   },
   "dependencies": {
     "@liaoliaots/nestjs-redis": "^10.0.0",
