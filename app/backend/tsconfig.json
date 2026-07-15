@@ -27,8 +27,7 @@
     // and were lifted into project-wide deprecation by the 6.0 release.
     // The value below is the highest version the locally-resolved
     // `typescript@5.9.3` (`app/backend`'s dep) understands. Bump this
-    // back to "7.0" once the project migrates off both flags AND
-    // upgrades `typescript` to >= 7.0.
+    // once the project upgrades TypeScript and migrates off these flags.
     "ignoreDeprecations": "5.0",
     "baseUrl": "./",
     "paths": {
