@@ -1,5 +1,19 @@
 import { PrismaClient, AppRole, Campaign } from '@prisma/client';
+import { createHash } from 'node:crypto';
+
 const prisma = new PrismaClient();
+
+/** Compute a SHA-256 hex digest — mirrors ApiKeysService.sha256Hex */
+function sha256Hex(value: string): string {
+  return createHash('sha256').update(value).digest('hex');
+}
+
+/** Build preview: first-6 + "..." + last-4 — mirrors ApiKeysService.maskPreview */
+function buildKeyPreview(rawKey: string): string {
+  const prefix = rawKey.slice(0, 6);
+  const suffix = rawKey.slice(-4);
+  return `${prefix}...${suffix}`;
+}
 
 async function main() {
   const roles = ['admin', 'ngo', 'user'];
@@ -15,35 +29,46 @@ async function main() {
   console.log('Seeded roles:', roles);
 
   // Seed development API keys
-  // WARNING: These are dev/test-only keys. In production, insert keys securely.
+  // Keys are stored as SHA-256 hashes + preview; the plaintext values below
+  // are ONLY used locally to derive the hash and are never persisted.
+  // In production, use the api-key-backfill script to migrate legacy rows.
   const devApiKeys = [
     {
-      key: 'dev-admin-key-000',
+      rawKey: 'dev-admin-key-000',
       role: AppRole.admin,
       description: 'Local development admin key',
     },
     {
-      key: 'dev-operator-key-001',
+      rawKey: 'dev-operator-key-001',
       role: AppRole.operator,
       description: 'Local development operator key',
     },
     {
-      key: 'dev-client-key-002',
+      rawKey: 'dev-client-key-002',
       role: AppRole.client,
       description: 'Local development client key',
     },
     {
-      key: 'dev-ngo-key-003',
+      rawKey: 'dev-ngo-key-003',
       role: AppRole.ngo,
       description: 'Local development NGO key',
     },
   ];
 
-  for (const data of devApiKeys) {
+  for (const { rawKey, role, description } of devApiKeys) {
+    const keyHash = sha256Hex(rawKey);
+    const keyPreview = buildKeyPreview(rawKey);
+
     await prisma.apiKey.upsert({
-      where: { key: data.key },
-      update: { role: data.role, description: data.description },
-      create: data,
+      where: { keyHash },
+      update: { role, description, keyPreview },
+      create: {
+        keyHash,
+        keyPreview,
+        key: null,  // never persist the plaintext value
+        role,
+        description,
+      },
     });
   }
 
