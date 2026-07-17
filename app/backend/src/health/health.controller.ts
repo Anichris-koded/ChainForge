@@ -9,7 +9,11 @@ import {
 import { Response } from 'express';
 import { RequestWithRequestId } from '../middleware/request-correlation.middleware';
 import { HealthService } from './health.service';
-import { LivenessResponse, ReadinessResponse } from './health.service';
+import {
+  LivenessResponse,
+  ReadinessResponse,
+  DependenciesResponse,
+} from './health.service';
 import { API_VERSIONS } from '../common/constants/api-version.constants';
 import { Public } from '../common/decorators/public.decorator';
 import { Throttle } from '@nestjs/throttler';
@@ -109,7 +113,27 @@ export class HealthController {
 
     return readiness;
   }
-
+  @Public()
+  @Get('dependencies')
+  @Version(API_VERSIONS.V1)
+  @ApiOperation({
+    summary: 'Dependency health with on-chain latency',
+    description:
+      'Reports the time taken for an on-chain RPC call as onchain_rpc_ms. Status is "degraded" if it exceeds 5s.',
+  })
+  @ApiOkResponse({ description: 'Dependency health retrieved.' })
+  @ApiServiceUnavailableResponse({
+    description: 'On-chain dependency is down.',
+  })
+  async dependencies(
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<DependenciesResponse> {
+    const result = await this.healthService.getDependenciesHealth();
+    if (result.status === 'down') {
+      res.status(HttpStatus.SERVICE_UNAVAILABLE); // only "down" is a 503
+    }
+    return result;
+  }
   @Get('error')
   @Version(API_VERSIONS.V1)
   @ApiOperation({ summary: 'Trigger an error for testing' })

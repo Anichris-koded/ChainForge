@@ -1,0 +1,11 @@
+legacy_to_v1:
+  "/ai/inference": "/v1/ai/inference"
+  "/ai/proof-of-life": "/v1/ai/proof-of-life"
+  "/ai/anonymize": "/v1/ai/anonymize"
+  "/ai/humanitarian/verify": "/v1/ai/humanitarian/verify"
+
+legacy_prefix_map:
+  - legacy_prefix: "/ai/status/"
+    v1_prefix: "/v1/ai/status/"
+  - legacy_prefix: "/ai/task/"
+    v1_prefix: "/v1/ai/task/"

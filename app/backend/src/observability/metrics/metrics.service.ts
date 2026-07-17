@@ -74,13 +74,22 @@ export class MetricsService {
   }
 
   /**
-   * Record HTTP request duration
+   * Record HTTP request duration (SLO histogram, issue #243).
+   *
+   * Includes `status_code` so Grafana panels can split p99 by outcome
+   * (e.g. isolate slow 200s from slow 500s).  Duration must be in seconds.
    */
-  recordHttpDuration(method: string, route: string, duration: number): void {
+  recordHttpDuration(
+    method: string,
+    route: string,
+    duration: number,
+    statusCode?: number,
+  ): void {
     this.httpRequestDuration.observe(
       {
         method,
         route,
+        status_code: statusCode !== undefined ? statusCode.toString() : '',
       },
       duration,
     );

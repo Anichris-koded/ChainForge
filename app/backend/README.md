@@ -194,12 +194,38 @@ curl http://localhost:3001/metrics
 
 Key metrics:
 - `http_requests_total` — Total HTTP requests by method, route, status code
-- `http_request_duration_seconds` — Request latency distribution
+- `http_request_duration_seconds` — Request latency histogram with SLO-tuned buckets (25 ms / 50 / 100 / 250 / 500 / 1 000 / 2 500 / 5 000 / 10 000 ms) for p99 alerting per route
 - `error_rate_total` — Error count across all systems
 - `ingestion_lag_seconds` — Time between event creation and processing
 - `webhook_retries_total` — Webhook delivery retry count
 - `jobs_processed_total` / `jobs_failed_total` — Background job success/failure rates
 - `onchain_operations_total` — On-chain operation counts by status
+
+#### Tail-latency SLO dashboard
+
+A Grafana dashboard for p99 / p95 / p50 per route is committed to the repository:
+
+```
+docs/observability/api-latency.json
+```
+
+Import it into Grafana via **Dashboards → Import → Upload JSON file** and select your Prometheus datasource. The dashboard provides:
+
+- **SLO stat panels** — current p99, p95, p50 across all routes with colour-coded thresholds
+- **p99 / p95 / p50 time-series per route** — filterable by route and HTTP method
+- **Bucket distribution panel** — shows observations spread across the 9 SLO buckets so you can confirm the histogram is healthy
+- **Slowest routes table** — sortable by p99 for quick triage
+- **Request rate and error rate panels** — 4xx/5xx breakdown per route
+
+PromQL to alert on p99 SLO breach (> 1 s):
+
+```promql
+histogram_quantile(0.99,
+  sum by (le, route, method)(
+    rate(http_request_duration_seconds_bucket[5m])
+  )
+) > 1
+```
 
 ### Structured logging
 

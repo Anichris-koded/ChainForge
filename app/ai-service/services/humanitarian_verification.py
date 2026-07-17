@@ -89,7 +89,7 @@ class HumanitarianVerificationService:
                             user_prompt=prompt["user"],
                             timeout=timeout,
                         )
-                        parsed = self._parse_json_response(raw_content)
+                        parsed = parse_verification_response(provider, raw_content)
                         if breaker:
                             breaker.record_success()
                         return {
@@ -98,6 +98,11 @@ class HumanitarianVerificationService:
                             "prompt_variant": prompt_variant,
                             "verification": parsed,
                             "raw_response": raw_content,
+                            "stamp": {
+                                "provider": provider,
+                                "model": model,
+                                "prompt_variant": prompt_variant,
+                            }
                         }
                     except Exception as exc:
                         if breaker:
@@ -273,12 +278,66 @@ class HumanitarianVerificationService:
         return json.dumps(stable_response, separators=(",", ":"), sort_keys=True)
 
     def _parse_json_response(self, content: str) -> Dict[str, Any]:
-        normalized = content.strip()
-        if normalized.startswith("```"):
-            normalized = normalized.strip("`")
-            if normalized.startswith("json"):
-                normalized = normalized[4:].strip()
+        return parse_verification_response("auto", content)
+
+
+def parse_verification_response(provider_name: str, raw_content: str) -> Dict[str, Any]:
+    """Parses raw verification response, handling JSON markdown blocks and potential truncations."""
+    normalized = raw_content.strip()
+    if normalized.startswith("```"):
+        normalized = normalized.strip("`")
+        if normalized.startswith("json"):
+            normalized = normalized[4:].strip()
+
+    try:
         parsed = json.loads(normalized)
-        if not isinstance(parsed, dict):
-            raise RuntimeError("LLM response must be a JSON object")
-        return parsed
+        if isinstance(parsed, dict):
+            return _normalize_verification_dict(parsed)
+    except json.JSONDecodeError:
+        pass
+
+    # Recovery parsing in case of truncation
+    import re
+    verdict_match = re.search(r'"verdict"\s*:\s*"([^"]+)"', normalized)
+    confidence_match = re.search(r'"confidence"\s*:\s*([0-9.]+)', normalized)
+    summary_match = re.search(r'"summary"\s*:\s*"([^"]*)"', normalized)
+
+    verdict = verdict_match.group(1) if verdict_match else "inconclusive"
+    confidence = float(confidence_match.group(1)) if confidence_match else 0.0
+    summary = summary_match.group(1) if summary_match else "Truncated response parsed via recovery"
+
+    if verdict not in ["credible", "partially_credible", "inconclusive", "not_credible"]:
+        verdict = "inconclusive"
+
+    return {
+        "verdict": verdict,
+        "confidence": confidence,
+        "summary": summary,
+        "criteria_assessment": None,
+        "risk_flags": None,
+        "missing_information": None,
+        "recommended_next_steps": None,
+    }
+
+
+def _normalize_verification_dict(parsed: Dict[str, Any]) -> Dict[str, Any]:
+    """Ensures a parsed dict strictly matches HumanitarianVerificationDetailsV2 structure."""
+    verdict = parsed.get("verdict", "inconclusive")
+    if verdict not in ["credible", "partially_credible", "inconclusive", "not_credible"]:
+        verdict = "inconclusive"
+
+    confidence = parsed.get("confidence", 0.0)
+    try:
+        confidence = float(confidence)
+    except (ValueError, TypeError):
+        confidence = 0.0
+
+    return {
+        "verdict": verdict,
+        "confidence": confidence,
+        "summary": str(parsed.get("summary", "")),
+        "criteria_assessment": parsed.get("criteria_assessment"),
+        "risk_flags": parsed.get("risk_flags"),
+        "missing_information": parsed.get("missing_information"),
+        "recommended_next_steps": parsed.get("recommended_next_steps"),
+    }

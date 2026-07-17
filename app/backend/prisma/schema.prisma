@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
 }
 
 enum CampaignStatus {
@@ -372,7 +372,7 @@ model Campaign {
 }
 
 model Role {
-  id   Int    @id @default(autoincrement())
+  id   String @id @default(cuid())
   name String @unique
 }
 

@@ -54,3 +54,11 @@ sys.modules["proof_of_life"] = _pol
 # doesn't crash when torch (vram) is a MagicMock.
 import metrics
 metrics.check_system_resources = lambda **kwargs: True
+
+
+def pytest_terminal_summary(terminalreporter):
+    try:
+        from services.pii_scrubber import PII_MODEL_VERSION
+        terminalreporter.write_sep("=", f"PII Scrubber Model Version: {PII_MODEL_VERSION}")
+    except ImportError:
+        pass

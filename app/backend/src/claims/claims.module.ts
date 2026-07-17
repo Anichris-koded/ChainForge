@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ClaimsService } from './claims.service';
-import { ClaimsController } from './claims.controller';
+import { ClaimLifecycleController } from './claim-lifecycle.controller';
+import { ClaimReceiptController } from './claim-receipt.controller';
+import { ClaimExportController } from './claim-export.controller';
 import { CancelAndReissueService } from './cancel-and-reissue.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { OnchainModule } from '../onchain/onchain.module';
@@ -23,7 +25,11 @@ import { NotificationsModule } from '../notifications/notifications.module';
     CommonServicesModule,
     NotificationsModule,
   ],
-  controllers: [ClaimsController],
+  controllers: [
+    ClaimLifecycleController,
+    ClaimReceiptController,
+    ClaimExportController,
+  ],
   providers: [ClaimsService, CancelAndReissueService, BudgetService],
   exports: [CancelAndReissueService],
 })

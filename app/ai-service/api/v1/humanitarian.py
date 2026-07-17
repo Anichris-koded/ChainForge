@@ -44,7 +44,22 @@ async def verify_humanitarian_claim(request: HumanitarianVerificationRequest):
                 )
             else:
                 raise exc
-        return HumanitarianVerificationResponse(success=True, **result)
+        from config import settings
+        provider = result.get("provider")
+        if provider == "openai":
+            model_version = settings.openai_model
+        elif provider == "groq":
+            model_version = settings.groq_model
+        else:
+            # Default fallback to active provider model or settings.openai_model
+            active_p = settings.get_active_provider()
+            model_version = settings.groq_model if active_p == "groq" else settings.openai_model
+
+        return HumanitarianVerificationResponse(success=True, model_version=model_version, **result)
     except Exception as e:
         logger.error("Humanitarian verification failed: %s", str(e), exc_info=True)
-        return HumanitarianVerificationResponse(success=False, error=str(e))
+        from config import settings
+        active_p = settings.get_active_provider()
+        model_version = settings.groq_model if active_p == "groq" else settings.openai_model
+        return HumanitarianVerificationResponse(success=False, error=str(e), model_version=model_version)
+

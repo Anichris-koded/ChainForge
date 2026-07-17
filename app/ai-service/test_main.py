@@ -226,3 +226,45 @@ def test_humanitarian_verification_failure(client, monkeypatch):
     data = response.json()
     assert data["success"] is False
     assert "all providers unavailable" in data["error"]
+
+
+def test_legacy_routes_deprecation_headers(client, monkeypatch):
+    """Test that all legacy /ai/* routes emit Sunset and Deprecation headers,
+    and preserve backwards compatibility (308 redirect or correct response)."""
+    # Temporarily set a specific retirement date for validation
+    monkeypatch.setattr(main.settings, "legacy_retirement_date", "2026-10-01")
+
+    legacy_redirect_routes = [
+        "/ai/inference",
+        "/ai/proof-of-life",
+        "/ai/anonymize",
+        "/ai/humanitarian/verify",
+        "/ai/status/test-task-id",
+        "/ai/task/test-task-id/cancel",
+    ]
+
+    for route in legacy_redirect_routes:
+        # We test post for these legacy routes; middleware intercepts and returns 308
+        response = client.post(route, follow_redirects=False)
+        assert response.status_code == 308, f"Route {route} did not return 308 redirect"
+        assert response.headers.get("Deprecation") == "true", f"Route {route} missing Deprecation header"
+        assert response.headers.get("Sunset") == "Thu, 01 Oct 2026 00:00:00 GMT", f"Route {route} missing or invalid Sunset header"
+
+    # Also test /ai/ocr which is served directly and should not redirect, but still have headers
+    response = client.post("/ai/ocr", follow_redirects=False)
+    # /ai/ocr without files will return 422 or 400, but should still have the legacy headers
+    assert response.status_code in (400, 422), f"/ai/ocr returned unexpected status {response.status_code}"
+    assert response.headers.get("Deprecation") == "true", "/ai/ocr missing Deprecation header"
+    assert response.headers.get("Sunset") == "Thu, 01 Oct 2026 00:00:00 GMT", "/ai/ocr missing or invalid Sunset header"
+
+    # Test that non-legacy routes (like health, metrics, v1 paths) do NOT have the headers
+    non_legacy_routes = [
+        "/health",
+        "/ai/metrics",
+        "/v1/ai/inference",
+    ]
+    for route in non_legacy_routes:
+        response = client.post(route, follow_redirects=False) if "inference" in route else client.get(route, follow_redirects=False)
+        assert "Deprecation" not in response.headers, f"Non-legacy route {route} has Deprecation header"
+        assert "Sunset" not in response.headers, f"Non-legacy route {route} has Sunset header"
+

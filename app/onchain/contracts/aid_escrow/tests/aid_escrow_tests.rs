@@ -456,6 +456,91 @@ mod claim {
         let with_proof = t.client.try_claim_with_proof(&id, &claimant, &proof);
         assert_eq!(with_proof, Err(Ok(Error::InvalidProof)));
     }
+
+    #[test]
+    fn merkle_allowlist_claim_fails_after_root_expiry() {
+        let t = TestSetup::new();
+        let claimant = Address::generate(&t.env);
+        t.fund_contract(ONE_TOKEN);
+
+        // Single-leaf tree: root == leaf and proof is empty.
+        let root_hex = claimant_leaf_hex(&t.env, &claimant);
+
+        // Allowlist root expires 1000s in the future, while the package itself
+        // stays claimable for an hour.
+        let root_expires_at = t.now() + 1000;
+
+        let mut metadata = Map::new(&t.env);
+        metadata.set(
+            Symbol::new(&t.env, "merkle_root"),
+            soroban_sdk::String::from_str(&t.env, &root_hex),
+        );
+        metadata.set(
+            Symbol::new(&t.env, "merkle_root_expires_at"),
+            soroban_sdk::String::from_str(&t.env, &root_expires_at.to_string()),
+        );
+
+        let id = t.client.create_package(
+            &t.admin,
+            &779u64,
+            &Address::generate(&t.env),
+            &ONE_TOKEN,
+            &t.token,
+            &(t.now() + 3600),
+            &metadata,
+        );
+
+        let proof: Vec<soroban_sdk::String> = Vec::new(&t.env);
+
+        // Advance the ledger to the expiry boundary (merkle_root_expires_at == now).
+        t.advance_time(1000);
+        let expired = t.client.try_claim_with_proof(&id, &claimant, &proof);
+        assert_eq!(expired, Err(Ok(Error::AllowlistExpired)));
+
+        // Advancing further keeps the allowlist expired.
+        t.advance_time(500);
+        let still_expired = t.client.try_claim_with_proof(&id, &claimant, &proof);
+        assert_eq!(still_expired, Err(Ok(Error::AllowlistExpired)));
+    }
+
+    #[test]
+    fn merkle_allowlist_claim_succeeds_before_root_expiry() {
+        let t = TestSetup::new();
+        let claimant = Address::generate(&t.env);
+        t.fund_contract(ONE_TOKEN);
+
+        let root_hex = claimant_leaf_hex(&t.env, &claimant);
+        let root_expires_at = t.now() + 1000;
+
+        let mut metadata = Map::new(&t.env);
+        metadata.set(
+            Symbol::new(&t.env, "merkle_root"),
+            soroban_sdk::String::from_str(&t.env, &root_hex),
+        );
+        metadata.set(
+            Symbol::new(&t.env, "merkle_root_expires_at"),
+            soroban_sdk::String::from_str(&t.env, &root_expires_at.to_string()),
+        );
+
+        let id = t.client.create_package(
+            &t.admin,
+            &780u64,
+            &Address::generate(&t.env),
+            &ONE_TOKEN,
+            &t.token,
+            &(t.now() + 3600),
+            &metadata,
+        );
+
+        // Just before expiry the allowlist is still active and the claim works.
+        t.advance_time(999);
+        let proof: Vec<soroban_sdk::String> = Vec::new(&t.env);
+        let with_proof = t.client.try_claim_with_proof(&id, &claimant, &proof);
+        assert!(with_proof.is_ok());
+
+        let token_client = TokenClient::new(&t.env, &t.token);
+        assert_eq!(token_client.balance(&claimant), ONE_TOKEN);
+    }
 }
 
 // ===========================================================================

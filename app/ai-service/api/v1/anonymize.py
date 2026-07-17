@@ -22,7 +22,11 @@ async def anonymize_text(request: AnonymizeRequest):
 
     try:
         result = _main.pii_scrubber_service.anonymize(request.text)
-        return AnonymizeResponse(success=True, **result)
+        from config import settings
+        active_p = settings.get_active_provider()
+        model_version = settings.groq_model if active_p == "groq" else settings.openai_model
+        return AnonymizeResponse(success=True, model_version=model_version, **result)
     except Exception as e:
         logger.error(f"Anonymization failed: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to anonymize text")
+

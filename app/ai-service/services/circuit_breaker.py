@@ -21,7 +21,10 @@ class CircuitBreaker:
     States:
     - CLOSED: Normal operation. Requests flow through.
     - OPEN: Service is failing. Requests fail-fast (return False/raise error).
-    - HALF_OPEN: Recovery window elapsed. Allow a request to test downstream health.
+    - HALF_OPEN: Recovery window elapsed. Probe requests are allowed through.
+      The breaker only returns to CLOSED after *success_threshold_in_half_open*
+      consecutive successes (default 2), preventing premature closure on a
+      single lucky probe.
 
     The breaker publishes Prometheus metrics on every state change:
       - CIRCUIT_STATE (Gauge): current state, encoded as 0/1/2.
@@ -31,13 +34,24 @@ class CircuitBreaker:
     exported values can never diverge from the underlying state.
     """
 
-    def __init__(self, name: str, failure_threshold: int = 3, recovery_timeout: float = 30.0):
+    def __init__(
+        self,
+        name: str,
+        failure_threshold: int = 3,
+        recovery_timeout: float = 30.0,
+        success_threshold_in_half_open: int = 2,
+    ):
         self.name = name
         self.failure_threshold = failure_threshold
         self.recovery_timeout = recovery_timeout
+        # Number of consecutive successes required in HALF_OPEN before
+        # the breaker transitions back to CLOSED.
+        self.success_threshold_in_half_open = success_threshold_in_half_open
 
         self.state = "CLOSED"  # CLOSED, OPEN, HALF_OPEN
         self.failure_count = 0
+        # Tracks consecutive successes accumulated while in HALF_OPEN.
+        self._half_open_success_count = 0
         self.last_state_change = time.time()
         self._lock = Lock()
 
@@ -48,7 +62,8 @@ class CircuitBreaker:
     def allow_request(self) -> bool:
         """
         Check if a request is allowed to proceed.
-        If in OPEN state and recovery timeout has elapsed, transitions to HALF_OPEN.
+        If in OPEN state and recovery timeout has elapsed, transitions to HALF_OPEN
+        and resets the consecutive-success counter for that probe window.
         """
         with self._lock:
             now = time.time()
@@ -64,6 +79,7 @@ class CircuitBreaker:
                         self.recovery_timeout,
                     )
                     self.state = "HALF_OPEN"
+                    self._half_open_success_count = 0
                     self.last_state_change = now
                     set_circuit_state(self.name, CIRCUIT_STATE_HALF_OPEN)
                     CIRCUIT_RECOVERY_TIME.labels(breaker_name=self.name).observe(recovery_seconds)
@@ -74,20 +90,38 @@ class CircuitBreaker:
     def record_success(self) -> None:
         """
         Record a successful request.
-        If in HALF_OPEN, transitions back to CLOSED and resets failure count.
+
+        In HALF_OPEN: increments the consecutive-success counter.  The breaker
+        only transitions to CLOSED once *success_threshold_in_half_open*
+        consecutive successes have been recorded, preventing premature closure
+        on a single lucky probe.  Requests continue to be allowed through while
+        the threshold is being accumulated.
+
+        In CLOSED: resets the failure counter (defensive, keeps count accurate).
         """
         with self._lock:
             now = time.time()
             if self.state == "HALF_OPEN":
+                self._half_open_success_count += 1
                 logger.info(
-                    "Circuit breaker for provider '%s' transitioning from HALF_OPEN to CLOSED "
-                    "(successful probe request)",
+                    "Circuit breaker for provider '%s' probe success %d/%d in HALF_OPEN",
                     self.name,
+                    self._half_open_success_count,
+                    self.success_threshold_in_half_open,
                 )
-                self.state = "CLOSED"
-                self.failure_count = 0
-                self.last_state_change = now
-                set_circuit_state(self.name, CIRCUIT_STATE_CLOSED)
+                if self._half_open_success_count >= self.success_threshold_in_half_open:
+                    logger.info(
+                        "Circuit breaker for provider '%s' transitioning from HALF_OPEN to CLOSED "
+                        "(%d consecutive successes reached threshold %d)",
+                        self.name,
+                        self._half_open_success_count,
+                        self.success_threshold_in_half_open,
+                    )
+                    self.state = "CLOSED"
+                    self.failure_count = 0
+                    self._half_open_success_count = 0
+                    self.last_state_change = now
+                    set_circuit_state(self.name, CIRCUIT_STATE_CLOSED)
             elif self.state == "CLOSED":
                 self.failure_count = 0
 
@@ -95,6 +129,7 @@ class CircuitBreaker:
         """
         Record a failed request.
         If in CLOSED and threshold is reached, or if in HALF_OPEN, transitions to OPEN.
+        Any accumulated HALF_OPEN consecutive-success count is reset on failure.
         """
         with self._lock:
             now = time.time()
@@ -110,5 +145,6 @@ class CircuitBreaker:
                     self.failure_threshold,
                 )
                 self.state = "OPEN"
+                self._half_open_success_count = 0
                 self.last_state_change = now
                 set_circuit_state(self.name, CIRCUIT_STATE_OPEN)

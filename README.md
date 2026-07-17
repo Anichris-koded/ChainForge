@@ -144,7 +144,11 @@ cd app/onchain && make test
 
 ## Contributing
 
-We welcome contributions that make humanitarian aid delivery more transparent and efficient. When submitting changes:
+We welcome contributions that make humanitarian aid delivery more transparent and efficient.
+
+Please read our [End-to-End Contributor Journey](docs/contributing/journey.md) for a complete walk-through of finding an issue, local setup, PR conventions, CI expectations, and the merge process.
+
+When submitting changes:
 
 1. Open an issue to discuss the proposed change before implementing
 2. Keep pull requests small and focused on a single concern

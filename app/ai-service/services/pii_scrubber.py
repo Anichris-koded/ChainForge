@@ -12,6 +12,8 @@ from spacy.language import Language
 from config import settings
 from services.test_provider import TestProvider
 
+PII_MODEL_VERSION = "1.0.0"
+
 
 @dataclass
 class PIISpan:
@@ -73,6 +75,7 @@ class PIIScrubberService:
     def __init__(self):
         self.nlp = self._build_nlp()
         self.test_provider = TestProvider()
+        metrics.PII_MODEL_VERSION.labels(version=PII_MODEL_VERSION).set(1)
 
     def anonymize(self, text: str) -> Dict[str, object]:
         """Return privacy-preserving anonymized text and summary metadata."""

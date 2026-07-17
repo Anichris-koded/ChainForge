@@ -17,7 +17,7 @@ ChainForge handles sensitive humanitarian aid data and recipient PII. We take se
 
 ### How to Report
 
-1. **Email**: Send a detailed report to the maintainers via the contact information in the README.
+1. **Email**: Send a detailed report to the maintainers at security@chainforge.app.
 2. **GitHub Private Disclosure**: Use [GitHub's private vulnerability reporting](https://github.com/ChainForgee/ChainForge/security/advisories/new) feature.
 
 ### What to Include
@@ -37,7 +37,7 @@ ChainForge handles sensitive humanitarian aid data and recipient PII. We take se
 
 Areas of particular concern given ChainForge's use case:
 
-- Smart contract vulnerabilities on Stellar/Soroban
+- Smart contract vulnerabilities on Stellar/Soroban. For more details on our scheduled external reviews, please refer to our [Third-Party Security Review Audit Plan](docs/security/audit-plan.md).
 - PII data exposure or leakage
 - Authentication and authorization bypasses
 - SQL/NoSQL injection

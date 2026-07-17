@@ -26,9 +26,10 @@
 
 BEGIN;
 
--- Step 1 (documentation only on SQLite, active on PostgreSQL):
--- Acquire advisory lock to prevent concurrent backfill runs.
--- SELECT pg_advisory_xact_lock(hashtext('backfill_api_key_hashes'));
+-- Step 1: Acquire advisory lock to prevent concurrent backfill runs.
+-- hashtext() is a built-in PostgreSQL function that converts a text value
+-- to a stable 32-bit integer, suitable for use as an advisory lock key.
+SELECT pg_advisory_xact_lock(hashtext('backfill_api_key_hashes'));
 
 -- Step 2: Clear the plaintext key for every row that the TS script
 -- has already hashed.  Rows where keyHash IS NULL are left untouched

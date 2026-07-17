@@ -154,5 +154,6 @@ GEMINI.md
 # Local planning/spec docs (not committed)
 docs/superpowers/
 plan.md
+tasks/
 .playwright-mcp/
 dump.rdb

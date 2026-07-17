@@ -5,12 +5,8 @@ import {
   Body,
   Param,
   Patch,
-  Query,
   Request,
-  Res,
-  Version,
 } from '@nestjs/common';
-import type { Response } from 'express';
 import { Request as ExpressRequest } from 'express';
 import {
   ApiTags,
@@ -20,21 +16,13 @@ import {
   ApiBadRequestResponse,
   ApiForbiddenResponse,
   ApiNotFoundResponse,
-  ApiUnauthorizedResponse,
   ApiBearerAuth,
-  ApiQuery,
 } from '@nestjs/swagger';
 import { ClaimsService } from './claims.service';
 import { CancelAndReissueService } from './cancel-and-reissue.service';
 import { CreateClaimDto } from './dto/create-claim.dto';
-import {
-  ClaimReceiptDto,
-  ClaimShareResponseDto,
-  SendReceiptShareDto,
-} from './dto/claim-receipt.dto';
 import { CancelClaimDto } from './dto/cancel-claim.dto';
 import { ReissueClaimDto } from './dto/reissue-claim.dto';
-import { ExportClaimsQueryDto } from './dto/export-claims.dto';
 import { Roles } from 'src/auth/roles.decorator';
 import { AppRole } from 'src/auth/app-role.enum';
 import { InternalNotesService } from 'src/common/services/internal-notes.service';
@@ -44,7 +32,7 @@ import { InternalNoteResponseDto } from 'src/common/dto/internal-note-response.d
 @ApiTags('Onchain Proxy')
 @ApiBearerAuth('JWT-auth')
 @Controller('claims')
-export class ClaimsController {
+export class ClaimLifecycleController {
   constructor(
     private readonly claimsService: ClaimsService,
     private readonly cancelAndReissueService: CancelAndReissueService,
@@ -53,6 +41,7 @@ export class ClaimsController {
 
   @Post()
   @ApiOperation({
+    operationId: 'ClaimsController_create_v1',
     summary: 'Create a claim',
     description: 'Initializes a new claim for a specific campaign.',
   })
@@ -72,6 +61,7 @@ export class ClaimsController {
 
   @Get()
   @ApiOperation({
+    operationId: 'ClaimsController_findAll_v1',
     summary: 'List all claims',
     description: 'Retrieves a list of all claims across all campaigns.',
   })
@@ -84,6 +74,7 @@ export class ClaimsController {
 
   @Get(':id')
   @ApiOperation({
+    operationId: 'ClaimsController_findOne_v1',
     summary: 'Get claim details',
     description:
       'Retrieves the current details and status of a specific claim.',
@@ -101,6 +92,7 @@ export class ClaimsController {
   @Post(':id/verify')
   @Roles(AppRole.operator, AppRole.admin)
   @ApiOperation({
+    operationId: 'ClaimsController_verify_v1',
     summary: 'Verify a claim',
     description: 'Marks a claim as verified. Requires operator or admin role.',
   })
@@ -123,6 +115,7 @@ export class ClaimsController {
   @Post(':id/approve')
   @Roles(AppRole.admin)
   @ApiOperation({
+    operationId: 'ClaimsController_approve_v1',
     summary: 'Approve a claim',
     description: 'Approves a verified claim. Requires admin role.',
   })
@@ -145,6 +138,7 @@ export class ClaimsController {
   @Post(':id/disburse')
   @Roles(AppRole.admin)
   @ApiOperation({
+    operationId: 'ClaimsController_disburse_v1',
     summary: 'Disburse funds for a claim',
     description:
       'Initiates on-chain disbursement for an approved claim. Requires admin role.',
@@ -190,6 +184,7 @@ export class ClaimsController {
 
   @Patch(':id/archive')
   @ApiOperation({
+    operationId: 'ClaimsController_archive_v1',
     summary: 'Archive a claim',
     description: 'Soft-archives a claim, hiding it from general listings.',
   })
@@ -206,48 +201,10 @@ export class ClaimsController {
     return this.claimsService.archive(id);
   }
 
-  @Get(':id/receipt')
-  @ApiOperation({
-    summary: 'Get claim receipt',
-    description: 'Generates a shareable receipt for the specified claim.',
-  })
-  @ApiOkResponse({
-    description: 'Claim receipt generated successfully.',
-    type: ClaimReceiptDto,
-  })
-  @ApiNotFoundResponse({
-    description: 'The specified claim was not found.',
-  })
-  getReceipt(@Param('id') id: string): Promise<ClaimReceiptDto> {
-    return this.claimsService.getReceipt(id);
-  }
-
-  @Post(':id/receipt/share')
-  @ApiOperation({
-    summary: 'Share claim receipt',
-    description:
-      'Generates and optionally sends the claim receipt via email or SMS.',
-  })
-  @ApiOkResponse({
-    description: 'Receipt generated and sharing initiated successfully.',
-    type: ClaimShareResponseDto,
-  })
-  @ApiBadRequestResponse({
-    description: 'Invalid share parameters.',
-  })
-  @ApiNotFoundResponse({
-    description: 'The specified claim was not found.',
-  })
-  shareReceipt(
-    @Param('id') id: string,
-    @Body() shareDto: SendReceiptShareDto,
-  ): Promise<ClaimShareResponseDto> {
-    return this.claimsService.shareReceipt(id, shareDto);
-  }
-
   @Post(':id/notes')
   @Roles(AppRole.operator, AppRole.admin)
   @ApiOperation({
+    operationId: 'ClaimsController_addNote_v1',
     summary: 'Add an internal note to a claim',
     description: 'Adds a secure internal note for staff review only.',
   })
@@ -270,6 +227,7 @@ export class ClaimsController {
   @Get(':id/notes')
   @Roles(AppRole.operator, AppRole.admin)
   @ApiOperation({
+    operationId: 'ClaimsController_getNotes_v1',
     summary: 'List internal notes for a claim',
     description: 'Retrieves all internal notes for a specific claim.',
   })
@@ -284,13 +242,10 @@ export class ClaimsController {
     return this.internalNotesService.findNotesByEntity('claim', id);
   }
 
-  // ---------------------------------------------------------------------------
-  // Cancel-and-Reissue
-  // ---------------------------------------------------------------------------
-
   @Post(':id/cancel')
   @Roles(AppRole.operator, AppRole.admin)
   @ApiOperation({
+    operationId: 'ClaimsController_cancel_v1',
     summary: 'Cancel a claim',
     description:
       'Cancels an active claim (requested / verified / approved). ' +
@@ -312,6 +267,7 @@ export class ClaimsController {
   @Post(':id/reissue')
   @Roles(AppRole.operator, AppRole.admin)
   @ApiOperation({
+    operationId: 'ClaimsController_reissue_v1',
     summary: 'Cancel and reissue a claim',
     description:
       'Atomically cancels the original claim and creates a replacement. ' +
@@ -349,6 +305,7 @@ export class ClaimsController {
   @Get(':id/reissue-history')
   @Roles(AppRole.operator, AppRole.admin)
   @ApiOperation({
+    operationId: 'ClaimsController_getReissueHistory_v1',
     summary: 'Get reissue chain for a claim',
     description:
       'Returns the full lineage of a claim — the original and every ' +
@@ -365,87 +322,5 @@ export class ClaimsController {
   @ApiNotFoundResponse({ description: 'Claim not found.' })
   getReissueHistory(@Param('id') id: string) {
     return this.cancelAndReissueService.getReissueHistory(id);
-  }
-
-  @Get('export')
-  @Version('1')
-  @Roles(AppRole.operator, AppRole.admin)
-  @ApiOperation({
-    summary: 'Export claims as CSV',
-    description:
-      'Exports claim records as CSV with support for date range, status, organization, token, and pagination filters. ' +
-      'Excludes sensitive recipient data (recipientRef is encrypted and not exported).',
-  })
-  @ApiOkResponse({
-    description: 'Claims exported successfully.',
-    content: {
-      'text/csv': {
-        schema: { type: 'string' },
-      },
-    },
-  })
-  @ApiUnauthorizedResponse({
-    description: 'Missing or invalid authentication credentials.',
-  })
-  @ApiForbiddenResponse({
-    description: 'Access denied - operator or admin role required.',
-  })
-  @ApiQuery({
-    name: 'from',
-    required: false,
-    description: 'Start date (ISO string)',
-  })
-  @ApiQuery({
-    name: 'to',
-    required: false,
-    description: 'End date (ISO string)',
-  })
-  @ApiQuery({
-    name: 'status',
-    required: false,
-    description: 'Claim status filter',
-  })
-  @ApiQuery({
-    name: 'campaignId',
-    required: false,
-    description: 'Campaign ID filter',
-  })
-  @ApiQuery({
-    name: 'orgId',
-    required: false,
-    description: 'Organization ID filter',
-  })
-  @ApiQuery({
-    name: 'tokenAddress',
-    required: false,
-    description: 'Token address filter',
-  })
-  @ApiQuery({
-    name: 'page',
-    required: false,
-    description: 'Page number (default: 1)',
-  })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    description: 'Items per page (default: 50, max: 200)',
-  })
-  async exportClaims(
-    @Query() query: ExportClaimsQueryDto,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    const result = await this.claimsService.exportClaims(query);
-
-    const csv = this.claimsService.buildCsv(result.data);
-    res.setHeader('Content-Type', 'text/csv');
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename="claims-export-${Date.now()}.csv"`,
-    );
-    res.setHeader('X-Total-Count', String(result.total));
-    res.setHeader('X-Page', String(result.page));
-    res.setHeader('X-Limit', String(result.limit));
-
-    return csv;
   }
 }

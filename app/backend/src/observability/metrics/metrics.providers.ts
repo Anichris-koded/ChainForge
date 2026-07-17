@@ -14,11 +14,19 @@ export const metricsProviders = [
     help: 'Total number of HTTP requests',
     labelNames: ['method', 'route', 'status_code'],
   }),
+  // Tail-latency SLO buckets (issue #243).
+  // Spans 25 ms → 10 000 ms so operators can alert on p99 per route.
+  // PromQL to query p99 per route:
+  //   histogram_quantile(0.99,
+  //     sum by (le, route, method)(
+  //       rate(http_request_duration_seconds_bucket[5m])
+  //     )
+  //   )
   makeHistogramProvider({
     name: 'http_request_duration_seconds',
-    help: 'Duration of HTTP requests in seconds',
-    labelNames: ['method', 'route'],
-    buckets: [0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 5],
+    help: 'Duration of HTTP requests in seconds, with SLO-tuned buckets for p99 alerting',
+    labelNames: ['method', 'route', 'status_code'],
+    buckets: [0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0],
   }),
 
   // Job Metrics

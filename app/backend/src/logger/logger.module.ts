@@ -6,3 +6,5 @@ import { LoggerService } from './logger.service';
   exports: [LoggerService],
 })
 export class LoggerModule {}
+
+export { LoggerService, BoundLogger } from './logger.service';

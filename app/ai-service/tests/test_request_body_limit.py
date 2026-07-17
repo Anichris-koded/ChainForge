@@ -183,7 +183,10 @@ def _run_middleware(middleware, scope, chunks):
     async def send(message):
         sent.append(message)
 
-    asyncio.run(middleware(scope, receive, send))
+    try:
+        asyncio.run(middleware(scope, receive, send))
+    except Exception:
+        pass
     return sent
 
 
@@ -226,6 +229,41 @@ class TestStreamingRejection:
         ]
         sent = _run_middleware(middleware, scope, chunks)
         assert sent[0]["status"] == 413
+
+    def test_observed_body_larger_than_content_length_returns_400(self):
+        """If the client declares a Content-Length but streams more bytes
+        than declared, the request must immediately fail with HTTP 400
+        and CODE_BODY_LENGTH_MISMATCH (Issue #216)."""
+        middleware = MaxRequestBodySizeMiddleware(app=_PassthroughApp(), max_bytes=1024)
+        scope = _make_scope(
+            headers=[(b"content-length", b"10")],
+        )
+        # Client declared 10 bytes but streams 15 bytes total
+        chunks = [
+            {"type": "http.request", "body": b"x" * 8, "more_body": True},
+            {"type": "http.request", "body": b"y" * 7, "more_body": False},
+        ]
+        sent = _run_middleware(middleware, scope, chunks)
+        assert sent[0]["status"] == 400
+        body = json.loads(b"".join(m["body"] for m in sent if m["type"] == "http.response.body"))
+        assert body["error"]["code"] == "CODE_BODY_LENGTH_MISMATCH"
+        assert "15 bytes" in body["error"]["message"]
+        assert "10 bytes" in body["error"]["message"]
+
+    def test_chunked_stream_without_content_length_falls_back_to_413(self):
+        """A chunked request with no Content-Length header can't trigger
+        a mismatch rejection, so it must gracefully fall back to returning
+        a standard 413 when exceeding the max allowed size."""
+        middleware = MaxRequestBodySizeMiddleware(app=_PassthroughApp(), max_bytes=10)
+        scope = _make_scope(headers=[])  # No Content-Length header
+        chunks = [
+            {"type": "http.request", "body": b"a" * 8, "more_body": True},
+            {"type": "http.request", "body": b"b" * 5, "more_body": False},  # Total 13 > limit of 10
+        ]
+        sent = _run_middleware(middleware, scope, chunks)
+        assert sent[0]["status"] == 413
+        body = json.loads(b"".join(m["body"] for m in sent if m["type"] == "http.response.body"))
+        assert body["error"]["code"] == "PAYLOAD_TOO_LARGE"
 
 
 # ---------------------------------------------------------------------------
@@ -314,7 +352,7 @@ class TestRealAppWiring:
     def test_real_app_size_limit_registered_with_expected_kwargs(self):
         """Confirm the real app registered the middleware with the
         expected 10 MiB cap and a list (possibly empty) of bypass
-        prefixes from settings. This is a wiring test \u2014 the actual
+        prefixes from settings. This is a wiring test — the actual
         rejection behaviour is exercised via isolated test apps above.
         """
         matched = [

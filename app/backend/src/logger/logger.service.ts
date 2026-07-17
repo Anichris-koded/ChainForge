@@ -3,8 +3,6 @@ import pino, { Logger as PinoLogger, Bindings, ChildLoggerOptions } from 'pino';
 import { AsyncLocalStorage } from 'async_hooks';
 import { CORRELATION_ID_KEY } from '../common/utils/correlation-id.util';
 
-// Type definitions
-type LogLevel = 'info' | 'error' | 'warn' | 'debug' | 'trace';
 type LogMessage = string | Record<string, unknown>;
 type LogMeta = Record<string, unknown> | undefined;
 type LogContext = string | undefined;
@@ -21,19 +19,22 @@ interface LogEntry {
 
 @Injectable()
 export class LoggerService implements NestLoggerService {
-  private readonly logger: PinoLogger;
-  private readonly asyncLocalStorage = new AsyncLocalStorage<
-    Map<string, unknown>
-  >();
+  protected logger: PinoLogger;
+  protected asyncLocalStorage: AsyncLocalStorage<Map<string, unknown>>;
 
   constructor() {
-    this.logger = pino({
+    this.asyncLocalStorage = new AsyncLocalStorage<Map<string, unknown>>();
+    this.logger = LoggerService.createLogger(this);
+  }
+
+  private static createLogger(service: LoggerService): PinoLogger {
+    return pino({
       level: process.env.LOG_LEVEL || 'info',
       timestamp: pino.stdTimeFunctions.isoTime,
       formatters: {
         level: (label: string): Record<string, unknown> => ({ level: label }),
         log: (object: Record<string, unknown>): Record<string, unknown> => {
-          const correlationId = this.getCorrelationId();
+          const correlationId = service.getCorrelationId();
           if (correlationId) {
             return { ...object, correlationId };
           }
@@ -189,54 +190,21 @@ export class LoggerService implements NestLoggerService {
   /**
    * Create a child logger with fixed correlation ID
    */
-  child(bindings: Bindings, options?: ChildLoggerOptions): LoggerService {
-    const childLogger = this.logger.child(bindings, options);
-    const correlationId = this.getCorrelationId();
+  child(bindings: Bindings, options?: ChildLoggerOptions): BoundLogger {
+    return new BoundLogger(
+      this.logger.child(bindings, options),
+      this.asyncLocalStorage,
+    );
+  }
+}
 
-    // Create a proxy that maintains correlation ID in methods
-    const proxy = new Proxy(this, {
-      get: (target: LoggerService, prop: string | symbol): unknown => {
-        if (prop === 'getLogger') {
-          return (): PinoLogger => childLogger;
-        }
-
-        const logMethods = ['log', 'error', 'warn', 'debug', 'verbose'];
-        if (typeof prop === 'string' && logMethods.includes(prop)) {
-          return (...args: unknown[]): void => {
-            const pinoMethod =
-              prop === 'verbose' ? 'trace' : (prop as LogLevel);
-            const lastArg = args[args.length - 1];
-
-            if (
-              lastArg &&
-              typeof lastArg === 'object' &&
-              !Array.isArray(lastArg)
-            ) {
-              // Meta object provided
-              const meta = {
-                ...(lastArg as Record<string, unknown>),
-                correlationId,
-              };
-              args[args.length - 1] = meta;
-            } else {
-              // No meta object, add one
-              args.push({ correlationId });
-            }
-
-            // Type assertion needed for dynamic method call
-            (
-              childLogger as unknown as Record<
-                string,
-                (...args: unknown[]) => void
-              >
-            )[pinoMethod](...args);
-          };
-        }
-
-        return target[prop as keyof LoggerService];
-      },
-    });
-
-    return proxy;
+export class BoundLogger extends LoggerService {
+  constructor(
+    logger: PinoLogger,
+    asyncLocalStorage: AsyncLocalStorage<Map<string, unknown>>,
+  ) {
+    super();
+    this.logger = logger;
+    this.asyncLocalStorage = asyncLocalStorage;
   }
 }

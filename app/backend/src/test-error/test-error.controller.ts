@@ -9,6 +9,7 @@ import {
   UnauthorizedException,
   ForbiddenException,
   NotFoundException,
+  ServiceUnavailableException,
   UsePipes,
 } from '@nestjs/common';
 import { CreateVerificationDto } from '../verification/dto/create-verification.dto';
@@ -22,6 +23,7 @@ import {
   ApiUnauthorizedResponse,
   ApiForbiddenResponse,
   ApiNotFoundResponse,
+  ApiServiceUnavailableResponse,
 } from '@nestjs/swagger';
 
 @ApiTags('Test Error')
@@ -62,6 +64,15 @@ export class TestErrorController {
   @Get('forbidden')
   getForbidden() {
     throw new ForbiddenException('Access denied');
+  }
+
+  @ApiOperation({ summary: 'Trigger a ServiceUnavailableException' })
+  @ApiServiceUnavailableResponse({
+    description: 'Service unavailable error triggered.',
+  })
+  @Get('service-unavailable')
+  getServiceUnavailable() {
+    throw new ServiceUnavailableException('Service temporarily unavailable');
   }
 
   @ApiOperation({ summary: 'Trigger a NotFoundException' })

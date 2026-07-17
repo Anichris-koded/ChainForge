@@ -47,6 +47,9 @@ jobs:
           NODE_ENV: development
         run: npm run spec:export
 
+      - name: Check for Prisma schema without migration
+        run: chmod +x app/backend/scripts/check-prisma-migration.sh && app/backend/scripts/check-prisma-migration.sh
+
       - name: Check for OpenAPI spec drift
         run: |
           git diff --exit-code app/frontend/openapi.json || \

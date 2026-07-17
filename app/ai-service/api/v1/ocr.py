@@ -87,6 +87,7 @@ async def process_ocr(
         metrics.logger.info(f"OCR Inference completed in {inference_latency:.4f}s")
 
         processing_time_ms = int((time.time() - start_time) * 1000)
+        model_version = settings.groq_model if settings.get_active_provider() == "groq" else settings.openai_model
 
         return OCRResponse(
             success=True,
@@ -99,12 +100,14 @@ async def process_ocr(
                 processing_time_ms=processing_time_ms,
             ),
             processing_time_ms=processing_time_ms,
+            model_version=model_version,
         )
 
     except HTTPException:
         raise
     except Exception as e:
         processing_time_ms = int((time.time() - start_time) * 1000)
+        model_version = settings.groq_model if settings.get_active_provider() == "groq" else settings.openai_model
         return OCRResponse(
             success=False,
             error={
@@ -112,4 +115,6 @@ async def process_ocr(
                 "message": str(e),
             },
             processing_time_ms=processing_time_ms,
+            model_version=model_version,
         )
+

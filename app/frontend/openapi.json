@@ -157,6 +157,25 @@
         ]
       }
     },
+    "/api/v1/health/dependencies": {
+      "get": {
+        "description": "Reports the time taken for an on-chain RPC call as onchain_rpc_ms. Status is \"degraded\" if it exceeds 5s.",
+        "operationId": "HealthController_dependencies_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Dependency health retrieved."
+          },
+          "503": {
+            "description": "On-chain dependency is down."
+          }
+        },
+        "summary": "Dependency health with on-chain latency",
+        "tags": [
+          "Health"
+        ]
+      }
+    },
     "/api/v1/health/error": {
       "get": {
         "operationId": "HealthController_triggerError_v1",
@@ -2050,6 +2069,21 @@
         ]
       }
     },
+    "/api/v1/test-error/service-unavailable": {
+      "get": {
+        "operationId": "TestErrorController_getServiceUnavailable_v1",
+        "parameters": [],
+        "responses": {
+          "503": {
+            "description": "Service unavailable error triggered."
+          }
+        },
+        "summary": "Trigger a ServiceUnavailableException",
+        "tags": [
+          "Test Error"
+        ]
+      }
+    },
     "/api/v1/test-error/not-found": {
       "get": {
         "operationId": "TestErrorController_getNotFound_v1",
@@ -2775,99 +2809,6 @@
         ]
       }
     },
-    "/api/v1/claims/{id}/receipt": {
-      "get": {
-        "description": "Generates a shareable receipt for the specified claim.",
-        "operationId": "ClaimsController_getReceipt_v1",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Claim receipt generated successfully.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ClaimReceiptDto"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "The specified claim was not found."
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Get claim receipt",
-        "tags": [
-          "Onchain Proxy"
-        ]
-      }
-    },
-    "/api/v1/claims/{id}/receipt/share": {
-      "post": {
-        "description": "Generates and optionally sends the claim receipt via email or SMS.",
-        "operationId": "ClaimsController_shareReceipt_v1",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SendReceiptShareDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Receipt generated and sharing initiated successfully.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ClaimShareResponseDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid share parameters."
-          },
-          "404": {
-            "description": "The specified claim was not found."
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Share claim receipt",
-        "tags": [
-          "Onchain Proxy"
-        ]
-      }
-    },
     "/api/v1/claims/{id}/notes": {
       "post": {
         "description": "Adds a secure internal note for staff review only.",
@@ -3114,6 +3055,99 @@
           }
         ],
         "summary": "Get reissue chain for a claim",
+        "tags": [
+          "Onchain Proxy"
+        ]
+      }
+    },
+    "/api/v1/claims/{id}/receipt": {
+      "get": {
+        "description": "Generates a shareable receipt for the specified claim.",
+        "operationId": "ClaimsController_getReceipt_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Claim receipt generated successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClaimReceiptDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The specified claim was not found."
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Get claim receipt",
+        "tags": [
+          "Onchain Proxy"
+        ]
+      }
+    },
+    "/api/v1/claims/{id}/receipt/share": {
+      "post": {
+        "description": "Generates and optionally sends the claim receipt via email or SMS.",
+        "operationId": "ClaimsController_shareReceipt_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendReceiptShareDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Receipt generated and sharing initiated successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClaimShareResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid share parameters."
+          },
+          "404": {
+            "description": "The specified claim was not found."
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Share claim receipt",
         "tags": [
           "Onchain Proxy"
         ]
@@ -5695,6 +5729,55 @@
           "tokenAddress"
         ]
       },
+      "CancelClaimDto": {
+        "type": "object",
+        "properties": {
+          "operatorId": {
+            "type": "string",
+            "description": "ID of the operator performing the cancellation.",
+            "example": "operator-uuid"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Human-readable reason for cancellation.",
+            "example": "Recipient relocated; package no longer applicable.",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "operatorId"
+        ]
+      },
+      "ReissueClaimDto": {
+        "type": "object",
+        "properties": {
+          "operatorId": {
+            "type": "string",
+            "description": "ID of the operator performing the reissue.",
+            "example": "operator-uuid"
+          },
+          "amount": {
+            "type": "number",
+            "description": "Override amount for the replacement package. Defaults to the original amount when omitted.",
+            "example": 750,
+            "minimum": 0
+          },
+          "recipientRef": {
+            "type": "string",
+            "description": "Override recipient reference for the replacement package.",
+            "example": "recipient-ref-new"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Human-readable reason for the reissue.",
+            "example": "Corrected amount after field verification.",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "operatorId"
+        ]
+      },
       "ClaimReceiptDto": {
         "type": "object",
         "properties": {
@@ -5821,55 +5904,6 @@
           "mimeType",
           "filename",
           "text"
-        ]
-      },
-      "CancelClaimDto": {
-        "type": "object",
-        "properties": {
-          "operatorId": {
-            "type": "string",
-            "description": "ID of the operator performing the cancellation.",
-            "example": "operator-uuid"
-          },
-          "reason": {
-            "type": "string",
-            "description": "Human-readable reason for cancellation.",
-            "example": "Recipient relocated; package no longer applicable.",
-            "maxLength": 500
-          }
-        },
-        "required": [
-          "operatorId"
-        ]
-      },
-      "ReissueClaimDto": {
-        "type": "object",
-        "properties": {
-          "operatorId": {
-            "type": "string",
-            "description": "ID of the operator performing the reissue.",
-            "example": "operator-uuid"
-          },
-          "amount": {
-            "type": "number",
-            "description": "Override amount for the replacement package. Defaults to the original amount when omitted.",
-            "example": 750,
-            "minimum": 0
-          },
-          "recipientRef": {
-            "type": "string",
-            "description": "Override recipient reference for the replacement package.",
-            "example": "recipient-ref-new"
-          },
-          "reason": {
-            "type": "string",
-            "description": "Human-readable reason for the reissue.",
-            "example": "Corrected amount after field verification.",
-            "maxLength": 500
-          }
-        },
-        "required": [
-          "operatorId"
         ]
       },
       "BreakdownEntry": {

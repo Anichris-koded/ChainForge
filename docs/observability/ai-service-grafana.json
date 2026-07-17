@@ -1,0 +1,85 @@
+{
+    "title": "AI Service Circuit Breaker States",
+    "description": "Grafana panel showing provider circuit breaker state with inline mapping: 0=CLOSED, 1=HALF_OPEN, 2=OPEN.",
+    "panels": [
+        {
+            "type": "stat",
+            "title": "Circuit breaker state by provider",
+            "targets": [
+                {
+                    "expr": "circuit_breaker_state{breaker_name=~\"openai|groq|test\"}",
+                    "legendFormat": "{{breaker_name}}"
+                }
+            ],
+            "options": {
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                }
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "short",
+                    "mappings": [
+                        {
+                            "type": "special",
+                            "options": {
+                                "match": "null",
+                                "result": {
+                                    "text": "unknown"
+                                }
+                            }
+                        }
+                    ],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "yellow",
+                                "value": 1
+                            },
+                            {
+                                "color": "red",
+                                "value": 2
+                            }
+                        ]
+                    }
+                },
+                "overrides": [
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Value"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.displayMode",
+                                "value": "color-background"
+                            }
+                        ]
+                    }
+                ]
+            },
+            "transformations": [
+                {
+                    "id": "labelsToFields",
+                    "options": {}
+                }
+            ],
+            "datasource": "Prometheus",
+            "options": {
+                "graphMode": "area",
+                "colorMode": "background",
+                "justifyMode": "center"
+            },
+            "description": "State mapping documented inline: 0=CLOSED, 1=HALF_OPEN, 2=OPEN. Use the same constants as metrics.py: CIRCUIT_STATE_CLOSED, CIRCUIT_STATE_HALF_OPEN, CIRCUIT_STATE_OPEN."
+        }
+    ]
+}

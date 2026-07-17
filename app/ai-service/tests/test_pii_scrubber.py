@@ -1,6 +1,7 @@
-from services.pii_scrubber import PIIScrubberService
+from services.pii_scrubber import PIIScrubberService, PII_MODEL_VERSION
 import metrics
 from unittest.mock import patch, MagicMock
+from prometheus_client import REGISTRY
 
 
 class TestPIIScrubberService:
@@ -35,3 +36,8 @@ class TestPIIScrubberService:
         result = self.service.anonymize("")
         assert result["anonymized_text"] == ""
         assert result["pii_summary"]["total"] == 0
+
+    def test_pii_model_version_exported(self):
+        val = REGISTRY.get_sample_value("pii_model_version", {"version": PII_MODEL_VERSION})
+        assert val is not None
+        assert val == 1.0

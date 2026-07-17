@@ -36,10 +36,17 @@ def test_circuit_breaker_basic_transitions():
     assert breaker.allow_request() is True
     assert breaker.state == "HALF_OPEN"
 
-    # 6. Success closes the circuit
+    # 6. Default success_threshold_in_half_open is 2, so first success
+    #    still leaves the breaker in HALF_OPEN.
+    breaker.record_success()
+    assert breaker.state == "HALF_OPEN"
+    assert breaker._half_open_success_count == 1
+
+    # 7. Second success meets the threshold → CLOSED
     breaker.record_success()
     assert breaker.state == "CLOSED"
     assert breaker.failure_count == 0
+    assert breaker._half_open_success_count == 0
 
 def test_circuit_breaker_half_open_failure():
     breaker = CircuitBreaker("test-provider", failure_threshold=2, recovery_timeout=0.1)
@@ -58,6 +65,154 @@ def test_circuit_breaker_half_open_failure():
     breaker.record_failure()
     assert breaker.state == "OPEN"
     assert breaker.allow_request() is False
+
+
+# ---------------------------------------------------------------------------
+# Acceptance criteria for issue #270
+# ---------------------------------------------------------------------------
+
+class TestHalfOpenSuccessThreshold:
+    """
+    Configurable success_threshold_in_half_open: the breaker must accumulate
+    N consecutive successes in HALF_OPEN before returning to CLOSED.
+    """
+
+    def _open_then_half_open(self, breaker: CircuitBreaker) -> None:
+        """Helper: trip the breaker and advance it to HALF_OPEN."""
+        breaker.record_failure()
+        assert breaker.state == "OPEN"
+        time.sleep(0.12)
+        assert breaker.allow_request() is True
+        assert breaker.state == "HALF_OPEN"
+
+    def test_threshold_3_two_successes_remain_half_open(self):
+        """
+        AC: threshold=3, 2 successes in HALF_OPEN → still HALF_OPEN.
+        """
+        breaker = CircuitBreaker(
+            "ac-threshold-3-partial",
+            failure_threshold=1,
+            recovery_timeout=0.1,
+            success_threshold_in_half_open=3,
+        )
+        self._open_then_half_open(breaker)
+
+        breaker.record_success()
+        assert breaker.state == "HALF_OPEN", "1st success must not close the circuit (threshold=3)"
+        assert breaker._half_open_success_count == 1
+
+        breaker.record_success()
+        assert breaker.state == "HALF_OPEN", "2nd success must not close the circuit (threshold=3)"
+        assert breaker._half_open_success_count == 2
+
+    def test_threshold_3_third_success_closes(self):
+        """
+        AC: threshold=3, 3rd consecutive success in HALF_OPEN → CLOSED.
+        """
+        breaker = CircuitBreaker(
+            "ac-threshold-3-full",
+            failure_threshold=1,
+            recovery_timeout=0.1,
+            success_threshold_in_half_open=3,
+        )
+        self._open_then_half_open(breaker)
+
+        breaker.record_success()
+        breaker.record_success()
+        assert breaker.state == "HALF_OPEN"
+
+        breaker.record_success()
+        assert breaker.state == "CLOSED", "3rd success must close the circuit (threshold=3)"
+        assert breaker.failure_count == 0
+        assert breaker._half_open_success_count == 0
+
+    def test_default_threshold_is_2(self):
+        """
+        Default success_threshold_in_half_open=2: first success stays HALF_OPEN,
+        second closes.
+        """
+        breaker = CircuitBreaker(
+            "default-threshold",
+            failure_threshold=1,
+            recovery_timeout=0.1,
+        )
+        assert breaker.success_threshold_in_half_open == 2
+        self._open_then_half_open(breaker)
+
+        breaker.record_success()
+        assert breaker.state == "HALF_OPEN"
+
+        breaker.record_success()
+        assert breaker.state == "CLOSED"
+
+    def test_threshold_1_single_success_closes(self):
+        """
+        threshold=1 restores the previous single-success behaviour.
+        """
+        breaker = CircuitBreaker(
+            "threshold-1",
+            failure_threshold=1,
+            recovery_timeout=0.1,
+            success_threshold_in_half_open=1,
+        )
+        self._open_then_half_open(breaker)
+
+        breaker.record_success()
+        assert breaker.state == "CLOSED"
+
+    def test_failure_resets_success_count_and_reopens(self):
+        """
+        A failure mid-probe must reset the accumulated success count and
+        reopen the circuit, so a subsequent HALF_OPEN entry starts from zero.
+        """
+        breaker = CircuitBreaker(
+            "failure-resets-count",
+            failure_threshold=1,
+            recovery_timeout=0.1,
+            success_threshold_in_half_open=3,
+        )
+        self._open_then_half_open(breaker)
+
+        breaker.record_success()
+        assert breaker._half_open_success_count == 1
+
+        # Failure mid-probe: count must be reset, circuit reopens
+        breaker.record_failure()
+        assert breaker.state == "OPEN"
+        assert breaker._half_open_success_count == 0
+
+        # Re-enter HALF_OPEN: must start accumulating from zero, not from 1
+        time.sleep(0.12)
+        assert breaker.allow_request() is True
+        assert breaker._half_open_success_count == 0
+
+        breaker.record_success()
+        assert breaker._half_open_success_count == 1
+        assert breaker.state == "HALF_OPEN"
+
+    def test_allow_request_resets_count_on_reentry(self):
+        """
+        allow_request() must reset _half_open_success_count every time the
+        breaker transitions OPEN → HALF_OPEN, ensuring each probe window is
+        independent.
+        """
+        breaker = CircuitBreaker(
+            "reentry-reset",
+            failure_threshold=1,
+            recovery_timeout=0.1,
+            success_threshold_in_half_open=3,
+        )
+        # First probe window: 1 success then a failure
+        self._open_then_half_open(breaker)
+        breaker.record_success()
+        assert breaker._half_open_success_count == 1
+        breaker.record_failure()  # reopens
+
+        # Second probe window must start from 0
+        time.sleep(0.12)
+        breaker.allow_request()
+        assert breaker._half_open_success_count == 0
+        assert breaker.state == "HALF_OPEN"
 
 
 class TestHumanitarianVerificationServiceCircuitBreaker:
@@ -140,6 +295,11 @@ def _sample(name: str, labels: dict) -> float:
 class TestCircuitBreakerMetrics:
     """Verify that CircuitBreaker publishes the metrics defined in metrics.py."""
 
+    def test_circuit_state_labels_use_named_constants(self):
+        assert metrics.CIRCUIT_STATE_LABELS[metrics.CIRCUIT_STATE_CLOSED] == "CLOSED"
+        assert metrics.CIRCUIT_STATE_LABELS[metrics.CIRCUIT_STATE_HALF_OPEN] == "HALF_OPEN"
+        assert metrics.CIRCUIT_STATE_LABELS[metrics.CIRCUIT_STATE_OPEN] == "OPEN"
+
     def test_initial_state_is_published(self):
         # Using a fresh breaker name ensures labels don't collide with other tests.
         CircuitBreaker("metrics-initial", failure_threshold=1, recovery_timeout=0.1)
@@ -198,6 +358,9 @@ class TestCircuitBreakerMetrics:
         breaker.record_failure()
         time.sleep(0.07)
         breaker.allow_request()  # -> HALF_OPEN
+        # Default success_threshold_in_half_open=2: need two successes to close
+        breaker.record_success()
+        assert breaker.state == "HALF_OPEN"  # still probing after 1st success
         breaker.record_success()
 
         assert _sample("circuit_breaker_state", {"breaker_name": "metrics-success"}) == 0

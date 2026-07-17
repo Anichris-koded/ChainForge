@@ -87,6 +87,9 @@ class Settings(BaseSettings):
     # always appended so operators cannot accidentally expose themselves.
     request_body_bypass_paths: str = ""
 
+    # Legacy route deprecation/retirement date (Sunset header)
+    legacy_retirement_date: str = "Wed, 01 Oct 2026 00:00:00 GMT"
+
     # Verification artifact access settings
     verification_artifacts_dir: str = "./artifacts/verification"
     verification_artifact_url_ttl_seconds: int = 300

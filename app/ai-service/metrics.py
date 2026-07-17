@@ -16,6 +16,7 @@ REQUEST_LATENCY = Histogram('api_request_latency_seconds', 'API request latency'
 MODEL_LOAD_TIME = Histogram('model_load_time_seconds', 'Model load time in seconds', ['model_name'])
 INFERENCE_LATENCY = Histogram('inference_latency_seconds', 'Inference latency in seconds', ['task_type'])
 PIPELINE_STEP_LATENCY = Histogram('pipeline_step_latency_seconds', 'Pipeline step latency in seconds', ['step_name'])
+PII_MODEL_VERSION = Gauge('pii_model_version', 'PII scrubber model version', ['version'])
 
 # Circuit breaker metrics
 # State is encoded numerically so it can be plotted over time:
@@ -41,6 +42,14 @@ CIRCUIT_RECOVERY_TIME = Histogram(
 CIRCUIT_STATE_CLOSED = 0
 CIRCUIT_STATE_HALF_OPEN = 1
 CIRCUIT_STATE_OPEN = 2
+
+# Human-readable labels for the encoded gauge values. This keeps the metric
+# values and the Grafana/operational mapping aligned with the same constants.
+CIRCUIT_STATE_LABELS = {
+    CIRCUIT_STATE_CLOSED: 'CLOSED',
+    CIRCUIT_STATE_HALF_OPEN: 'HALF_OPEN',
+    CIRCUIT_STATE_OPEN: 'OPEN',
+}
 
 
 def set_circuit_state(breaker_name: str, state_value: int) -> None:

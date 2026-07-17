@@ -1,4 +1,4 @@
-import { INestApplication, VersioningType } from '@nestjs/common';
+import { Logger, INestApplication, VersioningType } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -10,6 +10,8 @@ import {
   createHelmetMiddleware,
   createRateLimiter,
 } from '../src/common/security/security.module';
+import { RedisService } from '@liaoliaots/nestjs-redis';
+import RedisMock from 'ioredis-mock';
 
 type TestAppOptions = {
   enableDocs: boolean;
@@ -41,7 +43,7 @@ const createTestApp = async ({ enableDocs }: TestAppOptions) => {
   app.use(createHelmetMiddleware(configService));
   app.use(createCorsOriginValidator(configService));
   app.enableCors(buildCorsOptions(configService));
-  app.use(createRateLimiter(configService));
+  app.use(createRateLimiter(configService, app.get(RedisService)));
 
   if (enableDocs) {
     const swaggerConfig = new DocumentBuilder()
@@ -173,6 +175,7 @@ describe('Security (e2e)', () => {
     let now = initialNow;
     let nowSpy: jest.SpyInstance;
     let rateLimitApp: INestApplication;
+    let mockRedisClient: any;
 
     beforeEach(async () => {
       process.env.API_RATE_LIMIT = '2';
@@ -183,6 +186,10 @@ describe('Security (e2e)', () => {
       now = initialNow;
       nowSpy = jest.spyOn(Date, 'now').mockImplementation(() => now);
       rateLimitApp = await createTestApp({ enableDocs: true });
+
+      mockRedisClient = new RedisMock();
+      const redisService = rateLimitApp.get(RedisService);
+      jest.spyOn(redisService, 'getOrThrow').mockReturnValue(mockRedisClient);
     });
 
     afterEach(async () => {
@@ -193,6 +200,8 @@ describe('Security (e2e)', () => {
       process.env.THROTTLE_TTL = '60000';
       process.env.CORS_ORIGINS = 'http://localhost:3000';
       process.env.CORS_ALLOW_CREDENTIALS = 'false';
+      delete process.env.RATE_LIMIT_LIMIT;
+      delete process.env.RATE_LIMIT_WINDOW_MS;
     });
 
     it('should rate limit, include retry headers, and reset after the window passes', async () => {
@@ -230,6 +239,59 @@ describe('Security (e2e)', () => {
         const response = await request(server).get('/api/docs');
         expect(response.status).toBe(200);
       }
+    });
+
+    it('should rate limit 100 hits in 1 s => 80+ return 429, and include correct headers', async () => {
+      // Create a specific application instance configured for 20 req/s
+      process.env.RATE_LIMIT_LIMIT = '20';
+      process.env.RATE_LIMIT_WINDOW_MS = '1000';
+
+      const appInstance = await createTestApp({ enableDocs: false });
+      const redisService = appInstance.get(RedisService);
+      const testMockRedis = new RedisMock();
+      jest.spyOn(redisService, 'getOrThrow').mockReturnValue(testMockRedis as any);
+
+      const server = appInstance.getHttpServer();
+      const results: any[] = [];
+
+      for (let i = 0; i < 100; i += 1) {
+        results.push(request(server).get('/api/v1/'));
+      }
+
+      const responses = await Promise.all(results);
+      const count429 = responses.filter(r => r.status === 429).length;
+
+      expect(count429).toBeGreaterThanOrEqual(80);
+
+      const rateLimitedResponse = responses.find(r => r.status === 429);
+      expect(rateLimitedResponse).toBeDefined();
+      expect(rateLimitedResponse.headers['ratelimit-limit']).toBe('20');
+      expect(rateLimitedResponse.headers['ratelimit-remaining']).toBeDefined();
+      expect(rateLimitedResponse.headers['ratelimit-reset']).toBeDefined();
+      expect(rateLimitedResponse.headers['retry-after']).toBeDefined();
+
+      await appInstance.close();
+    });
+
+    it('should fail open with a WARN log, not 500, when Redis is down', async () => {
+      const appInstance = await createTestApp({ enableDocs: false });
+      const redisService = appInstance.get(RedisService);
+
+      jest.spyOn(redisService, 'getOrThrow').mockImplementation(() => {
+        throw new Error('Redis connection down');
+      });
+
+      const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => {});
+
+      const server = appInstance.getHttpServer();
+      const response = await request(server).get('/api/v1/');
+
+      expect(response.status).not.toBe(500);
+      expect(response.status).not.toBe(429);
+      expect(warnSpy).toHaveBeenCalled();
+
+      warnSpy.mockRestore();
+      await appInstance.close();
     });
   });
 

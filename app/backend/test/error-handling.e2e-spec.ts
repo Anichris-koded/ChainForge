@@ -1,3 +1,12 @@
+/**
+ * Error-envelope e2e tests.
+ *
+ * CONVENTION: every test must assert its status with a literal number,
+ * e.g. `.expect(503)` — never a variable. The coverage matrix in
+ * `test/error-envelope-coverage.spec.ts` statically scans this file for
+ * `.expect(NNN)` literals to verify that every 4xx/5xx status documented
+ * in the OpenAPI spec has an envelope test here.
+ */
 import { Test, TestingModule } from '@nestjs/testing';
 import {
   INestApplication,
@@ -11,7 +20,12 @@ import { RequestIdInterceptor } from '../src/common/interceptors/request-id.inte
 describe('Error Handling (e2e)', () => {
   let app: INestApplication;
 
+  // ApiKeyGuard is global; use its env-var fallback so requests reach the
+  // test-error controller instead of short-circuiting with 401.
+  const API_KEY = process.env.API_KEY || 'test-api-key-error-handling';
+
   beforeEach(async () => {
+    process.env.API_KEY = API_KEY;
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
@@ -52,9 +66,10 @@ describe('Error Handling (e2e)', () => {
     expect(typeof body.path).toBe('string');
   };
 
-  it('/test-error/generic-error (GET) - should return standardized error response', () => {
+  it('/test-error/generic (GET) - should return standardized error response', () => {
     return request(app.getHttpServer())
-      .get('/api/v1/test-error/generic-error')
+      .get('/api/v1/test-error/generic')
+      .set('x-api-key', API_KEY)
       .expect(500)
       .then(response => {
         expectErrorEnvelope(response.body);
@@ -66,7 +81,7 @@ describe('Error Handling (e2e)', () => {
           }),
           traceId: expect.any(String),
           timestamp: expect.any(String),
-          path: '/api/v1/test-error/generic-error',
+          path: '/api/v1/test-error/generic',
         });
       });
   });
@@ -74,6 +89,7 @@ describe('Error Handling (e2e)', () => {
   it('/test-error/bad-request (GET) - should return standardized error response', () => {
     return request(app.getHttpServer())
       .get('/api/v1/test-error/bad-request')
+      .set('x-api-key', API_KEY)
       .expect(400)
       .then(response => {
         expectErrorEnvelope(response.body);
@@ -91,6 +107,7 @@ describe('Error Handling (e2e)', () => {
   it('/test-error/internal-server-error (GET) - should return standardized error response', () => {
     return request(app.getHttpServer())
       .get('/api/v1/test-error/internal-server-error')
+      .set('x-api-key', API_KEY)
       .expect(500)
       .then(response => {
         expectErrorEnvelope(response.body);
@@ -108,6 +125,7 @@ describe('Error Handling (e2e)', () => {
   it('/test-error/unauthorized (GET) - should return 401 with standardized envelope', () => {
     return request(app.getHttpServer())
       .get('/api/v1/test-error/unauthorized')
+      .set('x-api-key', API_KEY)
       .expect(401)
       .then(response => {
         expectErrorEnvelope(response.body);
@@ -120,6 +138,7 @@ describe('Error Handling (e2e)', () => {
   it('/test-error/forbidden (GET) - should return 403 with standardized envelope', () => {
     return request(app.getHttpServer())
       .get('/api/v1/test-error/forbidden')
+      .set('x-api-key', API_KEY)
       .expect(403)
       .then(response => {
         expectErrorEnvelope(response.body);
@@ -132,6 +151,7 @@ describe('Error Handling (e2e)', () => {
   it('/test-error/not-found (GET) - should return 404 with standardized envelope', () => {
     return request(app.getHttpServer())
       .get('/api/v1/test-error/not-found')
+      .set('x-api-key', API_KEY)
       .expect(404)
       .then(response => {
         expectErrorEnvelope(response.body);
@@ -141,9 +161,23 @@ describe('Error Handling (e2e)', () => {
       });
   });
 
+  it('/test-error/service-unavailable (GET) - should return 503 with standardized envelope', () => {
+    return request(app.getHttpServer())
+      .get('/api/v1/test-error/service-unavailable')
+      .set('x-api-key', API_KEY)
+      .expect(503)
+      .then(response => {
+        expectErrorEnvelope(response.body);
+        expect(response.body.code).toBe(503);
+        expect(response.body.message).toBe('Service temporarily unavailable');
+        expect(response.body).toHaveProperty('traceId');
+      });
+  });
+
   it('/test-error/validation-error (POST) - should return standardized validation error response', () => {
     return request(app.getHttpServer())
       .post('/api/v1/test-error/validation-error')
+      .set('x-api-key', API_KEY)
       .send({ invalidField: 'invalid' })
       .expect(400)
       .then(response => {
@@ -156,6 +190,7 @@ describe('Error Handling (e2e)', () => {
   it('/test-error/prisma-error-simulation (GET) - should return standardized Prisma error response', () => {
     return request(app.getHttpServer())
       .get('/api/v1/test-error/prisma-error-simulation')
+      .set('x-api-key', API_KEY)
       .expect(409)
       .then(response => {
         expectErrorEnvelope(response.body);
@@ -176,6 +211,7 @@ describe('Error Handling (e2e)', () => {
   it('should include X-Request-ID header in response', () => {
     return request(app.getHttpServer())
       .get('/api/v1/test-error/bad-request')
+      .set('x-api-key', API_KEY)
       .expect(400)
       .then(response => {
         expect(response.headers).toHaveProperty('x-request-id');
@@ -187,6 +223,7 @@ describe('Error Handling (e2e)', () => {
     const customTraceId = 'MY-CUSTOM-TRACE-ID';
     return request(app.getHttpServer())
       .get('/api/v1/test-error/bad-request')
+      .set('x-api-key', API_KEY)
       .set('X-Request-ID', customTraceId)
       .expect(400)
       .then(response => {

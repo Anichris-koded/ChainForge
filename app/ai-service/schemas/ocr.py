@@ -1,3 +1,4 @@
+from typing import Optional
 from pydantic import BaseModel, Field
 
 
@@ -17,3 +18,5 @@ class OCRResponse(BaseModel):
     data: OCRData | None = None
     error: dict[str, str] | None = None
     processing_time_ms: int
+    model_version: Optional[str] = None
+
