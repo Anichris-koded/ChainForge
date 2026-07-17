@@ -1,6 +1,6 @@
 {  "compilerOptions": {
     "module": "commonjs",
-    "moduleResolution": "node16",
+    "moduleResolution": "node",
     "esModuleInterop": true,
     "isolatedModules": true,
     "declaration": true,
@@ -22,6 +22,15 @@
     // under `__tests__` subdirs without triggering TS5011 (their inferred
     // common root otherwise collapses to the `__tests__` folder).
     "rootDir": "./",
+    // TypeScript 6.x flags `baseUrl` and `moduleResolution: "node"` for
+    // removal in 7.x. They are required today by NestJS's runtime patterns
+    // and were lifted into project-wide deprecation by the 6.0 release.
+    // The value below is the highest version the locally-resolved
+    // `typescript@5.9.3` (`app/backend`'s dep) understands. Bump this
+    // back to "7.0" once the project migrates off both flags AND
+    // upgrades `typescript` to >= 7.0.
+    "ignoreDeprecations": "5.0",
+    "baseUrl": "./",
     "paths": {
       "src/*": ["src/*"]
     },
