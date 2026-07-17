@@ -1,5 +1,17 @@
 import { PrismaClient, AppRole, Campaign } from '@prisma/client';
+import { createHash } from 'node:crypto';
+
 const prisma = new PrismaClient();
+
+/** SHA-256 hex digest — mirrors api-keys.service.ts */
+function sha256Hex(value: string): string {
+  return createHash('sha256').update(value).digest('hex');
+}
+
+/** Preview mask: first 6 chars + "..." + last 4 chars */
+function maskPreview(rawKey: string): string {
+  return `${rawKey.slice(0, 6)}...${rawKey.slice(-4)}`;
+}
 
 async function main() {
   const roles = ['admin', 'ngo', 'user'];
@@ -40,10 +52,25 @@ async function main() {
   ];
 
   for (const data of devApiKeys) {
+    // Compute hash + preview so dev seeds exercise the same column shape as
+    // production keys created via ApiKeysService.
+    const keyHash = sha256Hex(data.key);
+    const keyPreview = maskPreview(data.key);
+
     await prisma.apiKey.upsert({
       where: { key: data.key },
-      update: { role: data.role, description: data.description },
-      create: data,
+      update: {
+        role: data.role,
+        description: data.description,
+        // Backfill hash/preview when re-seeding a pre-existing dev database.
+        keyHash,
+        keyPreview,
+      },
+      create: {
+        ...data,
+        keyHash,
+        keyPreview,
+      },
     });
   }
 
