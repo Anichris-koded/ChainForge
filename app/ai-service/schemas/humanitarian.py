@@ -17,3 +17,4 @@ class HumanitarianVerificationResponse(BaseModel):
     prompt_variant: Optional[str] = None
     verification: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
+    model_version: Optional[str] = None

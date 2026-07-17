@@ -66,3 +66,103 @@ class TestErrorDetail:
         response = OCRResponse(success=False, error=error, processing_time_ms=0)
         assert response.error == error
         assert response.error["code"] == "test_error"
+
+
+class TestSchemaModelVersionSnapshots:
+    """Pins model_version in expected output schema snapshots."""
+
+    def test_humanitarian_verification_response_snapshot(self):
+        from schemas.humanitarian import HumanitarianVerificationResponse
+        resp = HumanitarianVerificationResponse(
+            success=True,
+            provider="openai",
+            model="gpt-4o-mini",
+            prompt_variant="primary",
+            verification={"verdict": "credible", "confidence": 0.95},
+            model_version="gpt-4o-mini"
+        )
+        snapshot = resp.model_dump()
+        assert snapshot["model_version"] == "gpt-4o-mini"
+        assert snapshot["success"] is True
+        assert snapshot["provider"] == "openai"
+
+    def test_humanitarian_verification_response_v2_snapshot(self):
+        from schemas.humanitarian_verification_v2 import HumanitarianVerificationResponseV2, HumanitarianVerificationDetailsV2
+        resp = HumanitarianVerificationResponseV2(
+            success=True,
+            provider="openai",
+            model="gpt-4o-mini",
+            prompt_variant="primary",
+            verification=HumanitarianVerificationDetailsV2(
+                verdict="credible",
+                confidence=0.95,
+                summary="Clear test summary",
+                criteria_assessment=[
+                    {"criterion": "water_supply", "status": "met", "reason": "enough water"}
+                ],
+                risk_flags=[],
+                missing_information=[],
+                recommended_next_steps=[]
+            ),
+            model_version="gpt-4o-mini",
+            stamp={
+                "provider": "openai",
+                "model": "gpt-4o-mini",
+                "prompt_variant": "primary"
+            }
+        )
+        snapshot = resp.model_dump()
+        assert snapshot["model_version"] == "gpt-4o-mini"
+        assert snapshot["success"] is True
+        assert snapshot["provider"] == "openai"
+        assert snapshot["verification"]["verdict"] == "credible"
+        assert snapshot["verification"]["confidence"] == 0.95
+        assert snapshot["stamp"]["provider"] == "openai"
+        assert snapshot["stamp"]["model"] == "gpt-4o-mini"
+        assert snapshot["stamp"]["prompt_variant"] == "primary"
+
+        # Explicitly check json schema pinning
+        schema = HumanitarianVerificationResponseV2.model_json_schema()
+        assert "success" in schema["properties"]
+        assert "provider" in schema["properties"]
+        assert "model" in schema["properties"]
+        assert "prompt_variant" in schema["properties"]
+        assert "verification" in schema["properties"]
+        assert "stamp" in schema["properties"]
+        
+        # Details schema validation
+        details_schema = schema["$defs"]["HumanitarianVerificationDetailsV2"]["properties"]
+        assert "verdict" in details_schema
+        assert "confidence" in details_schema
+        assert "summary" in details_schema
+
+    def test_anonymize_response_snapshot(self):
+        from schemas.anonymization import AnonymizeResponse, PIISummary
+        resp = AnonymizeResponse(
+            success=True,
+            anonymized_text="Hello [RECIPIENT_NAME]",
+            original_length=15,
+            pii_summary=PIISummary(names=1, locations=0, dates=0, total=1),
+            model_version="gpt-4o-mini"
+        )
+        snapshot = resp.model_dump()
+        assert snapshot["model_version"] == "gpt-4o-mini"
+        assert snapshot["success"] is True
+
+    def test_ocr_response_snapshot(self):
+        from schemas.ocr import OCRResponse, OCRData, OCRFieldResult
+        resp = OCRResponse(
+            success=True,
+            data=OCRData(
+                fields={"name": OCRFieldResult(value="John", confidence=0.9)},
+                raw_text="Name: John",
+                processing_time_ms=120
+            ),
+            processing_time_ms=120,
+            model_version="gpt-4o-mini"
+        )
+        snapshot = resp.model_dump()
+        assert snapshot["model_version"] == "gpt-4o-mini"
+        assert snapshot["success"] is True
+
+

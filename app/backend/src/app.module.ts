@@ -3,8 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { BullModule } from '@nestjs/bullmq';
 import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
-import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { loadEnv } from './common/utils/env-loader';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -50,16 +49,7 @@ import { SandboxModule } from './sandbox/sandbox.module';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: (() => {
-        const candidates = [
-          join(__dirname, '..', '.env'),
-          join(process.cwd(), '.env'),
-          join(process.cwd(), 'app', 'backend', '.env'),
-        ];
-
-        const existing = candidates.filter(p => existsSync(p));
-        return existing.length > 0 ? existing : candidates;
-      })(),
+      envFilePath: loadEnv(),
     }),
 
     BullModule.forRootAsync({

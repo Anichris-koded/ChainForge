@@ -173,7 +173,10 @@ class TestOCRV1Path:
             files={"image": ("img.png", buf.getvalue(), "image/png")},
         )
         assert response.status_code == 200
-        assert "processing_time_ms" in response.json()
+        data = response.json()
+        assert "processing_time_ms" in data
+        assert data["model_version"] == "gpt-4o-mini"
+
 
 
 # ---------------------------------------------------------------------------
@@ -282,6 +285,8 @@ class TestAnonymizeV1:
         data = response.json()
         assert data["success"] is True
         assert "anonymized_text" in data
+        assert data["model_version"] == "gpt-4o-mini"
+
 
     def test_v1_anonymize_empty_text_returns_422(self, following_client):
         response = following_client.post("/v1/ai/anonymize", json={"text": ""})
@@ -325,6 +330,8 @@ class TestHumanitarianV1:
         data = response.json()
         assert data["success"] is True
         assert data["verification"]["verdict"] == "credible"
+        assert data["model_version"] == "gpt-4o-mini"
+
 
     def test_v1_humanitarian_verify_failure_path(self, following_client, monkeypatch):
         def fake_verify(

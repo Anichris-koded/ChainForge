@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, Optional
 
 from pydantic import BaseModel, Field
 
@@ -20,3 +20,4 @@ class AnonymizeResponse(BaseModel):
     original_length: int
     pii_summary: PIISummary
     token_counts: Dict[str, int] = Field(default_factory=dict)
+    model_version: Optional[str] = None

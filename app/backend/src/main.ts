@@ -6,9 +6,7 @@ import { AppModule } from './app.module';
 import { buildSwaggerConfig } from './swagger.config';
 import { LoggerService } from './logger/logger.service';
 import { LoggingInterceptor } from './interceptors/logging.interceptor';
-import { config as loadEnv } from 'dotenv';
-import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { loadEnv } from './common/utils/env-loader';
 
 import compression from 'compression';
 import { RequestIdInterceptor } from './common/interceptors/request-id.interceptor';
@@ -22,16 +20,7 @@ import { RedisService } from '@liaoliaots/nestjs-redis';
 
 async function bootstrap() {
   // Load environment variables
-  const candidates = [
-    join(process.cwd(), '.env'),
-    join(process.cwd(), 'app', 'backend', '.env'),
-    join(__dirname, '..', '.env'),
-  ];
-
-  const envPath = candidates.find(p => existsSync(p));
-  if (envPath) {
-    loadEnv({ path: envPath });
-  }
+  loadEnv();
 
   const app = await NestFactory.create(AppModule);
 

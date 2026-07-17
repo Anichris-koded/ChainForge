@@ -85,6 +85,10 @@ class TestHumanitarianVerificationService:
             "confidence": 0.74,
             "summary": "Deterministic verification output for testing",
             "verdict": "credible",
+            "criteria_assessment": None,
+            "risk_flags": None,
+            "missing_information": None,
+            "recommended_next_steps": None,
         }
 
     def test_deterministic_verify_claim_outputs_remain_stable_across_runs(self, monkeypatch):
@@ -220,3 +224,69 @@ class TestTestProvider:
 
         assert result["provider"] == "test"
         assert result["verification"]["verdict"] in {"credible", "inconclusive", "not_credible"}
+
+    def test_all_providers_shape_identity(self, monkeypatch):
+        from schemas.humanitarian_verification_v2 import HumanitarianVerificationResponseV2
+        monkeypatch.setattr(settings, "test_provider_mode", True)
+        monkeypatch.setattr(settings, "openai_api_key", "mock-openai-key")
+        monkeypatch.setattr(settings, "groq_api_key", "mock-groq-key")
+
+        openai_mock_response = '{"verdict": "credible", "confidence": 0.88, "summary": "mocked openai verification", "criteria_assessment": [], "risk_flags": [], "missing_information": [], "recommended_next_steps": []}'
+        groq_mock_response = '{"verdict": "not_credible", "confidence": 0.12, "summary": "mocked groq verification", "criteria_assessment": [], "risk_flags": [], "missing_information": [], "recommended_next_steps": []}'
+
+        def fake_call_openai(model, system_prompt, user_prompt, timeout=None):
+            return openai_mock_response
+
+        def fake_call_groq(model, system_prompt, user_prompt, timeout=None):
+            return groq_mock_response
+
+        monkeypatch.setattr(self.service, "_call_openai", fake_call_openai)
+        monkeypatch.setattr(self.service, "_call_groq", fake_call_groq)
+
+        # 1. Run test provider
+        res_test = self.service.verify_claim(
+            aid_claim="Food distribution completed in all sectors.",
+            supporting_evidence=["receipt"],
+            context_factors={},
+            provider_preference="test"
+        )
+
+        # 2. Run openai provider
+        res_openai = self.service.verify_claim(
+            aid_claim="Food distribution completed in all sectors.",
+            supporting_evidence=["receipt"],
+            context_factors={},
+            provider_preference="openai"
+        )
+
+        # 3. Run groq provider
+        res_groq = self.service.verify_claim(
+            aid_claim="Food distribution completed in all sectors.",
+            supporting_evidence=["receipt"],
+            context_factors={},
+            provider_preference="groq"
+        )
+
+        for result in [res_test, res_openai, res_groq]:
+            v2_obj = HumanitarianVerificationResponseV2(success=True, **result)
+            assert v2_obj.success is True
+            assert v2_obj.provider is not None
+            assert v2_obj.model is not None
+            assert v2_obj.prompt_variant is not None
+            assert v2_obj.verification is not None
+            assert v2_obj.stamp is not None
+            assert v2_obj.stamp["provider"] == v2_obj.provider
+            assert v2_obj.stamp["model"] == v2_obj.model
+            assert v2_obj.stamp["prompt_variant"] == v2_obj.prompt_variant
+
+            verif_dict = result["verification"]
+            assert set(verif_dict.keys()) == {
+                "verdict",
+                "confidence",
+                "summary",
+                "criteria_assessment",
+                "risk_flags",
+                "missing_information",
+                "recommended_next_steps"
+            }
+
