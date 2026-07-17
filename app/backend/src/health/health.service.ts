@@ -38,6 +38,16 @@ export interface ReadinessResponse {
   };
 }
 
+export interface DependenciesResponse {
+  status: 'ok' | 'degraded' | 'down'; // degraded = alive but slow
+  service: 'backend';
+  timestamp: string;
+  checks: {
+    onchain_rpc_ms: number; // the number the issue asks for
+    onchain: 'up' | 'down';
+  };
+}
+
 @Injectable()
 export class HealthService {
   constructor(
@@ -114,6 +124,44 @@ export class HealthService {
     };
   }
 
+  async getDependenciesHealth(): Promise<DependenciesResponse> {
+    const ONCHAIN_THRESHOLD_MS = 5000; // 5s = the "too slow" line from the issue
+
+    const startTime = Date.now(); // stopwatch START
+    let onchainStatus: 'up' | 'down' = 'up';
+
+    try {
+      // The one RPC call we time. Swap to getAdmin() if the maintainer asks.
+      await this.onchainAdapter.getContractMetadata();
+    } catch (error) {
+      onchainStatus = 'down';
+      const message =
+        error instanceof Error ? error.message : 'Unknown on-chain error';
+      this.logger.warn('Dependencies on-chain check failed', 'HealthService', {
+        error: message,
+      });
+    }
+
+    const onchainRpcMs = Date.now() - startTime; // stopwatch STOP → elapsed ms
+
+    // Decide overall status: dead > slow > healthy
+    let status: 'ok' | 'degraded' | 'down' = 'ok';
+    if (onchainStatus === 'down') {
+      status = 'down';
+    } else if (onchainRpcMs > ONCHAIN_THRESHOLD_MS) {
+      status = 'degraded';
+    }
+
+    return {
+      status,
+      service: 'backend',
+      timestamp: new Date().toISOString(),
+      checks: {
+        onchain_rpc_ms: onchainRpcMs,
+        onchain: onchainStatus,
+      },
+    };
+  }
   logHealthCheck(requestId?: string) {
     this.logger.log('Health check endpoint accessed', 'HealthService', {
       requestId,

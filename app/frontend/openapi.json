@@ -157,6 +157,25 @@
         ]
       }
     },
+    "/api/v1/health/dependencies": {
+      "get": {
+        "description": "Reports the time taken for an on-chain RPC call as onchain_rpc_ms. Status is \"degraded\" if it exceeds 5s.",
+        "operationId": "HealthController_dependencies_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Dependency health retrieved."
+          },
+          "503": {
+            "description": "On-chain dependency is down."
+          }
+        },
+        "summary": "Dependency health with on-chain latency",
+        "tags": [
+          "Health"
+        ]
+      }
+    },
     "/api/v1/health/error": {
       "get": {
         "operationId": "HealthController_triggerError_v1",
